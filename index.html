@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Citywalk 足迹</title>
+  <meta name="theme-color" content="#0d9488">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Citywalk">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <header id="app-header">
+    <div class="brand"><span class="brand-logo">🚶</span><span>Citywalk 足迹</span></div>
+    <div class="header-stats" id="header-stats"></div>
+  </header>
+
+  <main id="main">
+
+    <!-- 地图（汇总） -->
+    <section class="page active" id="page-map">
+      <div id="map"></div>
+
+      <div class="placing-banner hidden" id="placing-banner">
+        <span id="placing-text"></span>
+        <button id="placing-cancel">取消</button>
+      </div>
+
+      <div class="coverage-chip hidden" id="coverage-chip"></div>
+
+      <div class="map-ctl">
+        <button class="map-btn" id="btn-locate" title="定位到我">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        </button>
+        <button class="map-btn" id="btn-fit" title="全览所有足迹">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+        </button>
+        <button class="map-btn" id="btn-layers" title="图层">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5 9-5z"/><path d="m3 13.5 9 5 9-5"/></svg>
+        </button>
+      </div>
+
+      <div class="layers-panel hidden" id="layers-panel">
+        <div class="lp-group">
+          <div class="lp-title">底图</div>
+          <label><input type="radio" name="basemap" value="gaode" checked> 高德地图</label>
+          <label><input type="radio" name="basemap" value="osm"> OpenStreetMap</label>
+        </div>
+        <div class="lp-group">
+          <div class="lp-title">图层</div>
+          <label><input type="checkbox" id="ck-tracks" checked> 行走路线</label>
+          <label><input type="checkbox" id="ck-photos" checked> 照片</label>
+          <label><input type="checkbox" id="ck-coverage"> 探索网格</label>
+          <label class="lp-sub">网格大小
+            <select id="sel-grid">
+              <option value="14">粗（约 2.4 km）</option>
+              <option value="15" selected>中（约 1.2 km）</option>
+              <option value="16">细（约 0.6 km）</option>
+              <option value="17">极细（约 0.3 km）</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div class="sheet" id="tracks-sheet">
+        <button class="sheet-handle" id="sheet-toggle">
+          <span class="sheet-bar"></span>
+          <span id="sheet-title">路线</span>
+          <span class="sheet-arrow" id="sheet-arrow">▲</span>
+        </button>
+        <div class="sheet-body" id="track-list"></div>
+      </div>
+    </section>
+
+    <!-- 记录 -->
+    <section class="page" id="page-record">
+      <div class="rec-top">
+        <div class="rec-state-row">
+          <span class="rec-state" id="rec-state">准备就绪</span>
+        </div>
+        <div class="rec-stats">
+          <div class="rec-dist" id="rec-dist">0.00<span class="unit">km</span></div>
+          <div class="rec-sub"><span id="rec-dur">00:00</span> · <span id="rec-pts">0</span> 个轨迹点 · 精度 <span id="rec-acc">--</span></div>
+        </div>
+        <div class="rec-actions">
+          <button class="rec-btn rec-start" id="btn-rec-start">开始记录</button>
+          <button class="rec-btn rec-pause hidden" id="btn-rec-pause">暂停</button>
+          <button class="rec-btn rec-finish hidden" id="btn-rec-finish">结束</button>
+        </div>
+      </div>
+      <div id="rec-map"></div>
+    </section>
+
+    <!-- 照片 -->
+    <section class="page" id="page-photos">
+      <div class="page-scroll">
+        <div class="page-head">
+          <div class="page-title">照片墙 <span class="count" id="photo-count"></span></div>
+          <button class="btn btn-primary btn-sm" id="btn-add-photo">＋ 添加照片</button>
+          <input type="file" id="file-photos" accept="image/*" multiple hidden>
+        </div>
+        <p class="hint" id="photo-hint">添加照片后会自动读取拍摄位置（需要照片带 GPS 信息），并标注到地图上。微信/QQ 聊天传输的图会丢位置，请用「原图」、隔空投送或数据线。</p>
+        <div id="photo-grid" class="photo-grid"></div>
+      </div>
+    </section>
+
+    <!-- 设置 -->
+    <section class="page" id="page-settings">
+      <div class="page-scroll">
+        <div class="page-head"><div class="page-title">设置</div></div>
+
+        <div class="card">
+          <div class="card-title">数据备份</div>
+          <button class="btn btn-line" id="btn-export">导出全部数据（JSON）</button>
+          <button class="btn btn-line" id="btn-import">导入数据（JSON）</button>
+          <input type="file" id="file-import" accept=".json,application/json" hidden>
+          <button class="btn btn-line" id="btn-import-gpx">导入 GPX 路线</button>
+          <input type="file" id="file-gpx" accept=".gpx,application/gpx+xml" hidden>
+        </div>
+
+        <div class="card">
+          <div class="card-title">示例</div>
+          <button class="btn btn-line" id="btn-demo">生成示例路线（上海）</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">危险操作</div>
+          <button class="btn btn-line danger-line" id="btn-clear">清空全部数据</button>
+        </div>
+
+        <div class="card about">
+          <div class="card-title">关于</div>
+          <p>· 所有数据仅保存在本机浏览器（IndexedDB），不上传任何服务器。</p>
+          <p>· 坐标以 WGS-84 存储，高德底图显示时自动做 GCJ-02 偏移转换。</p>
+          <p>· 手机上使用定位需要 HTTPS 环境：建议把本文件夹部署到 GitHub Pages / Vercel 等静态托管，然后「添加到主屏幕」。</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <nav id="tabbar">
+    <button class="tab active" data-page="map">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>
+      <span>地图</span>
+    </button>
+    <button class="tab" data-page="record">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>
+      <span>记录</span>
+    </button>
+    <button class="tab" data-page="photos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.7"/><path d="m5.5 17 4.2-4.2a1.4 1.4 0 0 1 2 0l2.3 2.3 1.6-1.6a1.4 1.4 0 0 1 2 0l2.9 2.9"/></svg>
+      <span>照片</span>
+    </button>
+    <button class="tab" data-page="settings">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="4" y1="8" x2="20" y2="8"/><circle cx="14" cy="8" r="2.2"/><line x1="4" y1="16" x2="20" y2="16"/><circle cx="9" cy="16" r="2.2"/></svg>
+      <span>设置</span>
+    </button>
+  </nav>
+
+</div>
+
+<div id="toast-root"></div>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="vendor/exifr/exifr.umd.js"></script>
+<script src="js/geo.js"></script>
+<script src="js/util.js"></script>
+<script src="js/db.js"></script>
+<script src="js/coverage.js"></script>
+<script src="js/tracker.js"></script>
+<script src="js/photos.js"></script>
+<script src="js/mapView.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

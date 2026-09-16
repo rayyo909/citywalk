@@ -1,0 +1,146 @@
+/* 地图渲染：主地图 + 记录页实时地图共用底图工厂；
+   数据一律 WGS-84，高德底图（GCJ-02）显示时自动转换 */
+const MapView = (() => {
+  const DEFAULT_VIEW = [31.2304, 121.4737]; // 上海
+  let basemap = 'gaode';
+  let map = null;                 // 主地图
+  const maps = [];                // 所有地图实例（含记录页）
+  let groups = null;              // 主地图图层组
+  let mapClickHandler = null;
+  let photoClickHandler = null;
+
+  function makeLayers() {
+    return {
+      gaode: () => L.tileLayer(
+        'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
+        { subdomains: '1234', maxZoom: 19, maxNativeZoom: 18, attribution: '© 高德地图' }),
+      osm: () => L.tileLayer(
+        'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        { maxZoom: 19, attribution: '© OpenStreetMap contributors' }),
+    };
+  }
+
+  function createMap(el) {
+    const m = L.map(el, { zoomControl: false });
+    const defs = makeLayers();
+    m._cwLayers = { gaode: defs.gaode(), osm: defs.osm() };
+    m._cwLayers[basemap].addTo(m);
+    L.control.zoom({ position: 'bottomright' }).addTo(m);
+    maps.push(m);
+    return m;
+  }
+
+  function init(id) {
+    map = createMap(document.getElementById(id));
+    map.setView(DEFAULT_VIEW, 11);
+    groups = {
+      cov: L.layerGroup().addTo(map),
+      tracks: L.layerGroup().addTo(map),
+      photos: L.layerGroup().addTo(map),
+    };
+    map.on('click', e => mapClickHandler && mapClickHandler(e));
+  }
+
+  /* WGS-84 -> 当前底图显示坐标 [lat,lng] */
+  function disp(lat, lng) {
+    if (basemap === 'gaode' && !Geo.outOfChina(lng, lat)) {
+      const g = Geo.wgs2gcj(lat, lng);
+      return [g.lat, g.lng];
+    }
+    return [lat, lng];
+  }
+  /* 地图点击坐标 -> WGS-84 */
+  function toWgs(lat, lng) {
+    if (basemap === 'gaode' && !Geo.outOfChina(lng, lat)) return Geo.gcj2wgs(lat, lng);
+    return { lat, lng };
+  }
+
+  function setBasemap(name) {
+    basemap = name;
+    maps.forEach(m => {
+      m._cwLayers[name].addTo(m);
+      m._cwLayers[name === 'gaode' ? 'osm' : 'gaode'].remove();
+    });
+  }
+  const basemapName = () => basemap;
+
+  const palette = i => `hsl(${(i * 57 + 140) % 360},60%,42%)`;
+
+  function renderTracks(tracks) {
+    groups.tracks.clearLayers();
+    tracks.forEach((tr, i) => {
+      if (!tr.points || !tr.points.length) return;
+      const ll = tr.points.map(p => disp(p.lat, p.lng));
+      L.polyline(ll, { color: palette(i), weight: 3.5, opacity: 0.9 })
+        .bindPopup(
+          `<div class="tp"><div class="tp-name">${Util.esc(tr.name)}</div>` +
+          `<div class="tp-sub">${Util.fmtDate(tr.startTime)} · ${Geo.fmtDist(tr.distance)} · ${Geo.fmtDur(tr.activeMs)}</div></div>`,
+          { maxWidth: 260 })
+        .addTo(groups.tracks);
+    });
+  }
+
+  function renderPhotos(photos) {
+    groups.photos.clearLayers();
+    photos.forEach(ph => {
+      if (ph.lat == null || ph.lng == null) return;
+      const [la, ln] = disp(ph.lat, ph.lng);
+      const ic = L.divIcon({
+        className: 'photo-pin',
+        html: `<img src="${ph.thumb}" alt="">`,
+        iconSize: [38, 38], iconAnchor: [19, 19],
+      });
+      L.marker([la, ln], { icon: ic, title: ph.name })
+        .on('click', () => photoClickHandler && photoClickHandler(ph))
+        .addTo(groups.photos);
+    });
+  }
+
+  function renderCoverage(cov) {
+    groups.cov.clearLayers();
+    for (const b of Coverage.boundsList(cov)) {
+      const c1 = disp(b.latMax, b.lngMin), c2 = disp(b.latMin, b.lngMax);
+      L.rectangle([c1, c2], {
+        stroke: true, color: '#0d9488', weight: 0.6, opacity: 0.5,
+        fillColor: '#10b981', fillOpacity: 0.22, interactive: false,
+      }).addTo(groups.cov);
+    }
+  }
+  function clearCoverage() { groups.cov && groups.cov.clearLayers(); }
+
+  function fitAll(tracks, photos) {
+    const pts = [];
+    tracks.forEach(t => (t.points || []).forEach(p => pts.push(disp(p.lat, p.lng))));
+    photos.forEach(p => { if (p.lat != null) pts.push(disp(p.lat, p.lng)); });
+    if (!pts.length) { map.setView(DEFAULT_VIEW, 11); return; }
+    map.fitBounds(L.latLngBounds(pts).pad(0.12), { maxZoom: 16 });
+  }
+  function flyToTrack(tr) {
+    const ll = (tr.points || []).map(p => disp(p.lat, p.lng));
+    if (!ll.length) return;
+    map.fitBounds(L.latLngBounds(ll).pad(0.15), { maxZoom: 16 });
+  }
+
+  function locate() {
+    if (!('geolocation' in navigator)) { Util.toast('此浏览器不支持定位'); return; }
+    navigator.geolocation.getCurrentPosition(pos => {
+      const [la, ln] = disp(pos.coords.latitude, pos.coords.longitude);
+      map.setView([la, ln], 16);
+      const mk = L.circleMarker([la, ln], {
+        radius: 9, color: '#fff', weight: 3, fillColor: '#0d9488', fillOpacity: 1,
+      }).addTo(map);
+      setTimeout(() => mk.remove(), 5000);
+    }, err => Util.toast('定位失败：' + (err.message || '未授权')), 
+    { enableHighAccuracy: true, timeout: 10000 });
+  }
+
+  function invalidate() { map && map.invalidateSize(); }
+
+  return {
+    init, createMap, disp, toWgs, setBasemap, basemapName, trackColor: palette,
+    renderTracks, renderPhotos, renderCoverage, clearCoverage,
+    fitAll, flyToTrack, locate, invalidate,
+    onClick: f => mapClickHandler = f,
+    onPhotoClick: f => photoClickHandler = f,
+  };
+})();
