@@ -23,7 +23,19 @@ const MapView = (() => {
   function createMap(el) {
     const m = L.map(el, { zoomControl: false });
     const defs = makeLayers();
-    m._cwLayers = { gaode: defs.gaode(), osm: defs.osm() };
+    const osmLayer = defs.osm();
+    let osmErrors = 0;
+    /* OSM 瓦片在国内网络通常无法访问，连续失败时自动切回高德 */
+    osmLayer.on('tileerror', () => {
+      osmErrors++;
+      if (basemap === 'osm' && osmErrors >= 10) {
+        osmErrors = -100000; // 防重复触发
+        Util.toast('OpenStreetMap 加载失败（国内网络通常无法访问），已切回高德地图');
+        window.dispatchEvent(new CustomEvent('cw-osm-fallback'));
+        setBasemap('gaode');
+      }
+    });
+    m._cwLayers = { gaode: defs.gaode(), osm: osmLayer };
     m._cwLayers[basemap].addTo(m);
     L.control.zoom({ position: 'bottomright' }).addTo(m);
     maps.push(m);

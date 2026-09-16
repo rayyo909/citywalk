@@ -140,16 +140,40 @@ const App = (() => {
   }
 
   /* ---------- 地图页控件 ---------- */
+  /* 探测 OSM 瓦片服务是否可达（国内网络通常不通，避免切过去长时间灰屏） */
+  function probeOsm(timeoutMs = 4000) {
+    return new Promise(resolve => {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => { ctl.abort(); resolve(false); }, timeoutMs);
+      fetch('https://a.tile.openstreetmap.org/12/3370/1698.png',
+        { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: ctl.signal })
+        .then(() => { clearTimeout(timer); resolve(true); })
+        .catch(() => { clearTimeout(timer); resolve(false); });
+    });
+  }
+
   function bindMapControls() {
     document.getElementById('btn-locate').onclick = () => MapView.locate();
     document.getElementById('btn-fit').onclick = () => MapView.fitAll(tracks, photos);
     document.getElementById('btn-layers').onclick = () =>
       document.getElementById('layers-panel').classList.toggle('hidden');
 
+    const setRadio = v => {
+      const r = document.querySelector(`input[name=basemap][value="${v}"]`);
+      if (r) r.checked = true;
+    };
     Util.$$('input[name=basemap]').forEach(r => {
       r.checked = r.value === settings.basemap;
-      r.onchange = () => {
+      r.onchange = async () => {
         if (!r.checked) return;
+        if (r.value === 'osm') {
+          Util.toast('正在测试 OpenStreetMap 连通性…', 4000);
+          if (!(await probeOsm())) {
+            setRadio('gaode');
+            Util.toast('无法连接 OpenStreetMap（国内网络通常无法访问），已保持高德地图');
+            return;
+          }
+        }
         settings.basemap = r.value;
         saveSettings();
         MapView.setBasemap(r.value);
@@ -508,6 +532,19 @@ const App = (() => {
     const restored = Tracker.restore();
     await reload();
     if (restored) Util.toast('已恢复上次未完成的路线（已暂停），可到「记录」页继续');
+
+    /* 启动时恢复已保存的底图；若是 OSM 先探测可达性，不通则退回高德 */
+    if (settings.basemap === 'osm') {
+      probeOsm().then(ok => {
+        if (ok) MapView.setBasemap('osm');
+        else {
+          settings.basemap = 'gaode';
+          saveSettings();
+          const g = document.querySelector('input[name=basemap][value=gaode]');
+          if (g) g.checked = true;
+        }
+      });
+    }
     window.addEventListener('cw-geo-denied', () => {
       Util.openModal({
         title: '无法获取定位权限',
@@ -518,6 +555,15 @@ const App = (() => {
           <p class="modal-text"><b>3. 安卓</b><br>点地址栏左侧的锁图标 → 权限 → 位置 → 允许，然后刷新页面。</p>`,
         actions: [{ label: '知道了', value: 'ok', className: 'btn-primary' }],
       });
+    });
+
+    /* OSM 瓦片不可达时 mapView 会切回高德并触发此事件，同步设置和界面 */
+    window.addEventListener('cw-osm-fallback', () => {
+      settings.basemap = 'gaode';
+      saveSettings();
+      const radio = document.querySelector('input[name=basemap][value=gaode]');
+      if (radio) radio.checked = true;
+      renderAll();
     });
   }
 
