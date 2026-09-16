@@ -11,6 +11,7 @@ const Tracker = (() => {
   let watchId = null, wakeLock = null;
   let lastAcc = null, statusMsg = '';
   let persistTimer = null;
+  let lastDeniedEvt = 0;
 
   const listeners = new Set();
 
@@ -50,9 +51,17 @@ const Tracker = (() => {
     schedulePersist();
   }
   function handleErr(err) {
-    statusMsg = err && err.code === 1
-      ? '定位权限被拒绝，请在浏览器设置中允许'
-      : '暂时获取不到定位';
+    if (err && err.code === 1) {
+      statusMsg = '定位权限被拒';
+      // 弹一次排查指引（15 秒内不重复弹）
+      const now = Date.now();
+      if (now - lastDeniedEvt > 15000) {
+        lastDeniedEvt = now;
+        window.dispatchEvent(new CustomEvent('cw-geo-denied'));
+      }
+    } else {
+      statusMsg = '暂时获取不到定位';
+    }
     emit();
   }
 

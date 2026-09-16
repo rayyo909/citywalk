@@ -508,6 +508,17 @@ const App = (() => {
     const restored = Tracker.restore();
     await reload();
     if (restored) Util.toast('已恢复上次未完成的路线（已暂停），可到「记录」页继续');
+    window.addEventListener('cw-geo-denied', () => {
+      Util.openModal({
+        title: '无法获取定位权限',
+        content: `
+          <p class="modal-text">按顺序检查这三件事：</p>
+          <p class="modal-text"><b>1. 是否在微信/QQ 里打开的？</b><br>内置浏览器会禁用网页定位。点右上角「···」→「在浏览器打开」，或复制链接到 Safari / Chrome 再试。</p>
+          <p class="modal-text"><b>2. iPhone</b><br>设置 → 隐私与安全性 → 定位服务 → 打开总开关，并把列表中的「Safari 网站」设为「使用 App 期间」（添加到主屏幕的显示为 Citywalk）。若之前拒绝过，改完回到本页刷新。</p>
+          <p class="modal-text"><b>3. 安卓</b><br>点地址栏左侧的锁图标 → 权限 → 位置 → 允许，然后刷新页面。</p>`,
+        actions: [{ label: '知道了', value: 'ok', className: 'btn-primary' }],
+      });
+    });
   }
 
   return { init, reload, switchTab };
