@@ -167,8 +167,14 @@ const App = (() => {
   function bindMapControls() {
     document.getElementById('btn-locate').onclick = () => MapView.locate();
     document.getElementById('btn-fit').onclick = () => MapView.fitAll(tracks, photos);
-    document.getElementById('btn-layers').onclick = () =>
-      document.getElementById('layers-panel').classList.toggle('hidden');
+    const panel = document.getElementById('layers-panel');
+    document.getElementById('btn-layers').onclick = () => panel.classList.toggle('hidden');
+    /* 点击面板与图层按钮以外的任意位置（含地图）时收起面板 */
+    document.addEventListener('click', e => {
+      if (panel.classList.contains('hidden')) return;
+      if (panel.contains(e.target) || e.target.closest('#btn-layers')) return;
+      panel.classList.add('hidden');
+    });
 
     Util.$$('input[name=basemap]').forEach(r => {
       r.checked = r.value === settings.basemap;
