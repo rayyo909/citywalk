@@ -390,6 +390,26 @@ const App = (() => {
     MapView.onPhotoClick(openPhotoDetail);
   }
 
+  /* ---------- 备份提醒：iOS 删除主屏幕图标会连带清空本地数据，定期导出以防丢失 ---------- */
+  function updateBackupStatus() {
+    const el = document.getElementById('backup-status');
+    if (!el) return;
+    const last = +(localStorage.getItem('cw-last-backup') || 0);
+    const stale = !last || Date.now() - last > 7 * 86400000;
+    el.textContent = last
+      ? `上次备份：${Util.fmtDateTime(last)}` + (stale ? ' · 已超过 7 天，建议重新导出' : '')
+      : '数据只保存在本机（卸载/删除主屏幕图标会被清空），建议尽快导出一份备份';
+    el.classList.toggle('stale', stale && tracks.length > 0);
+  }
+  function maybeRemindBackup() {
+    if (!tracks.length) return;
+    if (sessionStorage.getItem('cw-backup-reminded')) return;
+    const last = +(localStorage.getItem('cw-last-backup') || 0);
+    if (last && Date.now() - last < 7 * 86400000) return;
+    sessionStorage.setItem('cw-backup-reminded', '1');
+    Util.toast('数据仅存本机，建议到「设置 → 导出全部数据」做备份', 4500);
+  }
+
   /* ---------- 设置页 ---------- */
   const blobToDataURL = b => new Promise((res, rej) => {
     const r = new FileReader();
@@ -409,6 +429,9 @@ const App = (() => {
       }
       Util.downloadFile(JSON.stringify(data),
         `walkies-backup-${Util.fmtDate(Date.now())}.json`, 'application/json');
+      localStorage.setItem('cw-last-backup', String(Date.now()));
+      updateBackupStatus();
+      Util.toast('已导出，请妥善保存该文件');
     };
 
     document.getElementById('btn-import').onclick = () =>
@@ -548,6 +571,8 @@ const App = (() => {
     const restored = Tracker.restore();
     await reload();
     if (restored) Util.toast('已恢复上次未完成的路线（已暂停），可到「记录」页继续');
+    updateBackupStatus();
+    maybeRemindBackup();
 
     /* 启动时恢复已保存的底图（非高德系先探测可达性，不通则退回高德标准） */
     if (MapView.basemapName() !== settings.basemap) {
