@@ -607,16 +607,8 @@ const App = (() => {
     document.getElementById('btn-switch').onclick = () => showPage('tracks');
     document.getElementById('btn-avatar').onclick = () => showPage('settings');
 
-    /* GO：空闲=开始记录并进入记录页；记录中=回到记录页 */
-    document.getElementById('btn-go').onclick = () => {
-      if (Tracker.getState() === 'idle') {
-        showPage('record');
-        Tracker.start();
-        centerRecMapOnce();
-      } else {
-        showPage('record');
-      }
-    };
+    /* GO：进入记录页（不自动开始），由用户点「开始记录」 */
+    document.getElementById('btn-go').onclick = () => showPage('record');
 
     bindMapControls();
     bindRecordUI();
