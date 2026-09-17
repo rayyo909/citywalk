@@ -106,9 +106,9 @@ const MapView = (() => {
         .bindPopup(popup(), { maxWidth: 260 })
         .addTo(groups.tracks);
       /* 起点：白环 + 路线色芯；终点：白环 + 品牌橙 */
-      L.circleMarker(ll[0], { radius: 5, color: '#ffffff', weight: 2.5, fillColor: c, fillOpacity: 1 })
+      L.circleMarker(ll[0], { radius: 3.5, color: '#ffffff', weight: 1.8, fillColor: c, fillOpacity: 1 })
         .addTo(groups.tracks);
-      L.circleMarker(ll[ll.length - 1], { radius: 5.5, color: '#ffffff', weight: 2.5, fillColor: '#f97316', fillOpacity: 1 })
+      L.circleMarker(ll[ll.length - 1], { radius: 4, color: '#ffffff', weight: 1.8, fillColor: '#f97316', fillOpacity: 1 })
         .bindPopup(popup(), { maxWidth: 260 })
         .addTo(groups.tracks);
     });
