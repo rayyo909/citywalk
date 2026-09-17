@@ -40,11 +40,35 @@ const MapView = (() => {
       }
     });
     m._cwLayers = { gaode: defs.gaode(), osm: osmLayer };
+    retryTiles(m._cwLayers.gaode);
+    retryTiles(osmLayer);
     m._cwLayers[layerKeyOf(basemap)].addTo(m);
     m.getPane('tilePane').classList.toggle('cw-clean', basemap === 'clean');
     L.control.zoom({ position: 'bottomright' }).addTo(m);
     maps.push(m);
     return m;
+  }
+
+  /* 瓦片加载失败自动重试（限流/瞬时网络故障自愈）：
+     单片失败 2.5s 后重试一次；重试仍失败累计 8 片则整层重载（节流 8s） */
+  function retryTiles(layer) {
+    let hardFails = 0, lastRedraw = 0;
+    layer.on('tileerror', e => {
+      const tile = e.tile;
+      if (!tile) return;
+      if (!tile.dataset.cwRetried) {
+        tile.dataset.cwRetried = '1';
+        setTimeout(() => { tile.src = e.url + (e.url.includes('?') ? '&' : '?') + '_r=' + Date.now(); }, 2500);
+        return;
+      }
+      hardFails++;
+      const now = Date.now();
+      if (hardFails >= 8 && now - lastRedraw > 8000) {
+        lastRedraw = now;
+        hardFails = 0;
+        layer.redraw();
+      }
+    });
   }
 
   function init(id) {

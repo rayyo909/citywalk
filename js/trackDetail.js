@@ -141,6 +141,7 @@ const TrackDetail = (() => {
     renderAll(colorIdx);
     refreshPhotos();
     setTimeout(() => map && map.invalidateSize(), 80);
+    setTimeout(() => map && map.invalidateSize(), 450);
   }
 
   function bindUI() {

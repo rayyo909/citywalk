@@ -25,10 +25,14 @@ const App = (() => {
   /* ---------- 页面导航 ---------- */
   function showPage(name) {
     document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
-    if (name === 'map') setTimeout(() => MapView.invalidate(), 60);
+    if (name === 'map') {
+      setTimeout(() => MapView.invalidate(), 60);
+      setTimeout(() => MapView.invalidate(), 400);
+    }
     if (name === 'record') {
       ensureRecMap();
       setTimeout(() => recMap && recMap.invalidateSize(), 60);
+      setTimeout(() => recMap && recMap.invalidateSize(), 400);
     }
   }
   function activePage() {
@@ -625,19 +629,33 @@ const App = (() => {
     await reload();
     renderRecordUI(Tracker.snapshot());
 
-    /* iOS Safari 地址栏收展时可视高度变化，同步容器高度保持全屏贴合（仅手机，桌面由 CSS 控制） */
+    /* iOS Safari 地址栏收展/锁屏回前台时可视高度变化，同步容器高度并重算地图尺寸。
+       resize+scroll 双监听 + 双段 invalidate，规避 Safari 视口事件不稳定 */
     if (window.visualViewport) {
       const vv = window.visualViewport;
       const appEl = document.getElementById('app');
       const isDesktop = () => window.matchMedia('(min-width: 600px)').matches;
+      let lastH = 0;
       const fitVp = () => {
-        if (isDesktop()) { appEl.style.height = ''; return; }
+        if (isDesktop()) { if (appEl.style.height) appEl.style.height = ''; return; }
+        if (Math.abs(vv.height - lastH) < 1) return;
+        lastH = vv.height;
         appEl.style.height = vv.height + 'px';
-        setTimeout(() => MapView.invalidateAll(), 120);
+        requestAnimationFrame(() => MapView.invalidateAll());
+        setTimeout(() => MapView.invalidateAll(), 350);
       };
       vv.addEventListener('resize', fitVp);
+      vv.addEventListener('scroll', fitVp);
       fitVp();
     }
+    /* 锁屏/切后台回来后地图尺寸可能失效，直接重算 */
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        MapView.invalidateAll();
+        setTimeout(() => MapView.invalidateAll(), 300);
+      }
+    });
+
 
     if (restored) Util.toast('已恢复上次未完成的路线（已暂停），点 GO 继续');
     updateBackupStatus();
