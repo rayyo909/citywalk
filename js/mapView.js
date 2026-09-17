@@ -95,10 +95,13 @@ const MapView = (() => {
       const popup = () =>
         `<div class="tp"><div class="tp-name">${Util.esc(tr.name)}</div>` +
         `<div class="tp-sub">${Util.fmtDate(tr.startTime)} · ${Geo.fmtDist(tr.distance)} · ${Geo.fmtDur(tr.activeMs)}</div></div>`;
-      /* 白色描边打底，让路线从路网里跳出来 */
-      L.polyline(ll, { color: '#ffffff', weight: 7, opacity: 0.85, interactive: false })
+      /* 白色描边打底 + 细点状虚线，路线轻盈且在路网上依然清晰 */
+      L.polyline(ll, { color: '#ffffff', weight: 5.5, opacity: 0.95, interactive: false })
         .addTo(groups.tracks);
-      L.polyline(ll, { color: palette(i), weight: 4, opacity: 0.95 })
+      L.polyline(ll, {
+        color: palette(i), weight: 3, opacity: 0.95,
+        dashArray: '0.5 8', lineCap: 'round', lineJoin: 'round',
+      })
         .bindPopup(popup(), { maxWidth: 260 })
         .addTo(groups.tracks);
     });
