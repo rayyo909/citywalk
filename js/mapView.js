@@ -95,13 +95,20 @@ const MapView = (() => {
       const popup = () =>
         `<div class="tp"><div class="tp-name">${Util.esc(tr.name)}</div>` +
         `<div class="tp-sub">${Util.fmtDate(tr.startTime)} · ${Geo.fmtDist(tr.distance)} · ${Geo.fmtDur(tr.activeMs)}</div></div>`;
-      /* 白色描边打底 + 细点状虚线，路线轻盈且在路网上依然清晰 */
-      L.polyline(ll, { color: '#ffffff', weight: 5.5, opacity: 0.95, interactive: false })
+      /* 路线三层：深色阴影打底（立体感）+ 细小淡点轨迹 + 起终点标记 */
+      const c = palette(i);
+      L.polyline(ll, { color: '#0f3d3a', weight: 5, opacity: 0.28, interactive: false })
         .addTo(groups.tracks);
       L.polyline(ll, {
-        color: palette(i), weight: 3, opacity: 0.95,
-        dashArray: '0.5 8', lineCap: 'round', lineJoin: 'round',
+        color: c, weight: 2.2, opacity: 0.65,
+        dashArray: '0.1 6', lineCap: 'round', lineJoin: 'round',
       })
+        .bindPopup(popup(), { maxWidth: 260 })
+        .addTo(groups.tracks);
+      /* 起点：白环 + 路线色芯；终点：白环 + 品牌橙 */
+      L.circleMarker(ll[0], { radius: 5, color: '#ffffff', weight: 2.5, fillColor: c, fillOpacity: 1 })
+        .addTo(groups.tracks);
+      L.circleMarker(ll[ll.length - 1], { radius: 5.5, color: '#ffffff', weight: 2.5, fillColor: '#f97316', fillOpacity: 1 })
         .bindPopup(popup(), { maxWidth: 260 })
         .addTo(groups.tracks);
     });
