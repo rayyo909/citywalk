@@ -1,17 +1,17 @@
 /* ===== Citywalk 足迹 ===== */
 :root {
-  --primary: #0d9488;
-  --primary-dark: #0f766e;
-  --primary-light: #ccfbf1;
-  --accent: #f97316;
+  --primary: #243C5E;      /* 主色·绛蓝 */
+  --primary-dark: #1B2E49;
+  --primary-light: #E9EBF0;
+  --accent: #912C34;       /* 点睛·绛红 */
   --danger: #e11d48;
-  --bg: #f5f6f8;
-  --card: #ffffff;
-  --text: #1f2937;
-  --muted: #6b7280;
-  --line: #e5e7eb;
+  --bg: #F7F3EF;           /* 背景底色·米白 */
+  --card: #FFFDFA;
+  --text: #2D2D2D;
+  --muted: #8A8580;
+  --line: #E6E0D8;
   --radius: 14px;
-  --shadow: 0 4px 20px rgba(17, 24, 39, .10);
+  --shadow: 0 4px 20px rgba(45, 45, 45, .10);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -19,7 +19,7 @@ html, body { height: 100%; }
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
-  background: #e8eaee;
+  background: #E9E4DE;
   color: var(--text);
   overscroll-behavior: none;
 }
@@ -116,7 +116,7 @@ body {
 
 .coverage-chip {
   position: absolute; top: 14px; left: 12px; z-index: 500;
-  background: rgba(13, 148, 136, .92); color: #fff;
+  background: rgba(145, 44, 52, .92); color: #fff;
   font-size: 12.5px; padding: 7px 12px; border-radius: 999px;
   box-shadow: var(--shadow); max-width: 70%;
 }
@@ -129,7 +129,7 @@ body {
   box-shadow: var(--shadow);
 }
 .placing-banner span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.placing-banner button { background: none; border: none; color: #5eead4; font-size: 14px; cursor: pointer; padding: 4px; }
+.placing-banner button { background: none; border: none; color: #E5B5B9; font-size: 14px; cursor: pointer; padding: 4px; }
 
 /* 路线列表抽屉 */
 .sheet {
@@ -206,7 +206,7 @@ body {
   transition: transform .1s;
 }
 .rec-btn:active { transform: scale(.96); }
-.rec-start { background: var(--primary); color: #fff; box-shadow: 0 6px 18px rgba(13,148,136,.4); }
+.rec-start { background: var(--primary); color: #fff; box-shadow: 0 6px 18px rgba(36,60,94,.35); }
 .rec-pause { background: #fef3c7; color: #92400e; }
 .rec-finish { background: #111827; color: #fff; }
 
@@ -233,8 +233,7 @@ body {
 .btn-sm { padding: 7px 14px; }
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-primary:active { background: var(--primary-dark); }
-.btn-line {
-  display: block; width: 100%; text-align: left;
+.btn-line {  display: block; width: 100%; text-align: left;
   background: var(--bg); color: var(--text);
   padding: 11px 14px; margin-bottom: 8px; font-size: 14px;
 }
@@ -296,5 +295,5 @@ body {
 
 .hidden { display: none !important; }
 
-/* 清新底图：降低瓦片饱和度并提亮，弱化路网/POI 干扰，突出路线（保持色彩不灰暗） */
-.leaflet-tile-pane.cw-clean { filter: saturate(.5) brightness(1.16) contrast(.94); }
+/* 清新底图：降低瓦片饱和度并提亮，加一丝暖调与米白背景呼应 */
+.leaflet-tile-pane.cw-clean { filter: saturate(.48) brightness(1.12) contrast(.94) sepia(.06); }

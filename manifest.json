@@ -4,8 +4,8 @@
   "description": "记录每次行走的路线与照片，在地图上汇总你的城市足迹",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#f5f6f8",
-  "theme_color": "#0d9488",
+  "background_color": "#F7F3EF",
+  "theme_color": "#243C5E",
   "icons": [
     {
       "src": "icons/icon.svg",

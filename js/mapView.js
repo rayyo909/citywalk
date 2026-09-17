@@ -85,7 +85,9 @@ const MapView = (() => {
   }
   const basemapName = () => basemap;
 
-  const palette = i => `hsl(${(i * 57 + 140) % 360},60%,42%)`;
+  /* 红蓝家族的克制色序：绛蓝 → 绛红 → 紫灰 → 赭褐 → 青灰 */
+  const ROUTE_COLORS = ['#243C5E', '#912C34', '#5E4A6B', '#8C6A4A', '#4A6B72'];
+  const palette = i => ROUTE_COLORS[i % ROUTE_COLORS.length];
 
   function renderTracks(tracks) {
     groups.tracks.clearLayers();
@@ -97,7 +99,7 @@ const MapView = (() => {
         `<div class="tp-sub">${Util.fmtDate(tr.startTime)} · ${Geo.fmtDist(tr.distance)} · ${Geo.fmtDur(tr.activeMs)}</div></div>`;
       /* 路线三层：细阴影打底（立体感）+ 细小淡点轨迹 + 起终点标记 */
       const c = palette(i);
-      L.polyline(ll, { color: '#0f3d3a', weight: 3, opacity: 0.25, interactive: false })
+      L.polyline(ll, { color: '#1B2E49', weight: 3, opacity: 0.25, interactive: false })
         .addTo(groups.tracks);
       L.polyline(ll, {
         color: c, weight: 2.2, opacity: 0.65,
@@ -108,7 +110,7 @@ const MapView = (() => {
       /* 起点：白环 + 路线色芯；终点：白环 + 品牌橙 */
       L.circleMarker(ll[0], { radius: 3.5, color: '#ffffff', weight: 1, fillColor: c, fillOpacity: 1 })
         .addTo(groups.tracks);
-      L.circleMarker(ll[ll.length - 1], { radius: 4, color: '#ffffff', weight: 1, fillColor: '#f97316', fillOpacity: 1 })
+      L.circleMarker(ll[ll.length - 1], { radius: 4, color: '#ffffff', weight: 1, fillColor: '#912C34', fillOpacity: 1 })
         .bindPopup(popup(), { maxWidth: 260 })
         .addTo(groups.tracks);
     });
@@ -135,8 +137,8 @@ const MapView = (() => {
     for (const b of Coverage.boundsList(cov)) {
       const c1 = disp(b.latMax, b.lngMin), c2 = disp(b.latMin, b.lngMax);
       L.rectangle([c1, c2], {
-        stroke: true, color: '#0d9488', weight: 0.6, opacity: 0.5,
-        fillColor: '#10b981', fillOpacity: 0.22, interactive: false,
+        stroke: true, color: '#912C34', weight: 0.6, opacity: 0.5,
+        fillColor: '#912C34', fillOpacity: 0.22, interactive: false,
       }).addTo(groups.cov);
     }
   }
@@ -161,7 +163,7 @@ const MapView = (() => {
       const [la, ln] = disp(pos.coords.latitude, pos.coords.longitude);
       map.setView([la, ln], 16);
       const mk = L.circleMarker([la, ln], {
-        radius: 9, color: '#fff', weight: 3, fillColor: '#0d9488', fillOpacity: 1,
+        radius: 9, color: '#fff', weight: 3, fillColor: '#243C5E', fillOpacity: 1,
       }).addTo(map);
       setTimeout(() => mk.remove(), 5000);
     }, err => Util.toast('定位失败：' + (err.message || '未授权')), 

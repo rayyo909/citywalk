@@ -29,9 +29,9 @@ const App = (() => {
     if (recMap) return;
     recMap = MapView.createMap(document.getElementById('rec-map'));
     recMap.setView([31.2304, 121.4737], 15);
-    liveLine = L.polyline([], { color: '#0d9488', weight: 5, opacity: 0.9 }).addTo(recMap);
+    liveLine = L.polyline([], { color: '#243C5E', weight: 5, opacity: 0.9 }).addTo(recMap);
     liveDot = L.circleMarker([0, 0], {
-      radius: 8, color: '#fff', weight: 3, fillColor: '#0d9488', fillOpacity: 1,
+      radius: 8, color: '#fff', weight: 3, fillColor: '#243C5E', fillOpacity: 1,
     }).addTo(recMap);
     const s = Tracker.snapshot();
     if (s.points.length) updateLive(s, true);
