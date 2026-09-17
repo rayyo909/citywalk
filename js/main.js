@@ -63,7 +63,7 @@ const App = (() => {
     updateLive(s);
   }
 
-  const defaultName = ts => Util.fmtDate(ts || Date.now()) + ' Citywalk';
+  const defaultName = ts => Util.fmtDate(ts || Date.now()) + ' 走走';
 
   async function onFinishClick() {
     if (Tracker.getState() === 'idle') return;
@@ -79,7 +79,7 @@ const App = (() => {
     const inp = document.createElement('input');
     inp.className = 'input';
     inp.value = defaultName();
-    inp.placeholder = '给这次 Citywalk 起个名字';
+    inp.placeholder = '给这次行走起个名字';
     wrap.appendChild(inp);
     const act = await Util.openModal({
       title: '结束记录',
@@ -210,7 +210,7 @@ const App = (() => {
     const list = document.getElementById('track-list');
     document.getElementById('sheet-title').textContent = `路线（${tracks.length}）`;
     if (!tracks.length) {
-      list.innerHTML = '<div class="sheet-empty">还没有路线，去「记录」页开始第一次 Citywalk 吧</div>';
+      list.innerHTML = '<div class="sheet-empty">还没有路线，去「记录」页出去走走吧</div>';
       return;
     }
     list.innerHTML = tracks.map((tr, i) => `
@@ -232,7 +232,7 @@ const App = (() => {
     const pts = tr.points.map(p =>
       `      <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lng.toFixed(6)}"><time>${new Date(p.t).toISOString()}</time></trkpt>`
     ).join('\n');
-    const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Citywalk 足迹" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>${Util.esc(tr.name)}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>\n</gpx>`;
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="走走 Walkies" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>${Util.esc(tr.name)}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>\n</gpx>`;
     Util.downloadFile(gpx, tr.name.replace(/[\\/:*?"<>|]/g, '_') + '.gpx', 'application/gpx+xml');
   }
 
@@ -386,13 +386,13 @@ const App = (() => {
     document.getElementById('btn-export').onclick = async () => {
       if (!tracks.length && !photos.length) { Util.toast('还没有数据可导出'); return; }
       Util.toast('正在打包…');
-      const data = { app: 'citywalk', version: 1, exportedAt: Date.now(), tracks, photos: [] };
+      const data = { app: 'walkies', version: 1, exportedAt: Date.now(), tracks, photos: [] };
       for (const ph of photos) {
         const { blob, ...rest } = ph;
         data.photos.push({ ...rest, blobB64: await blobToDataURL(blob) });
       }
       Util.downloadFile(JSON.stringify(data),
-        `citywalk-backup-${Util.fmtDate(Date.now())}.json`, 'application/json');
+        `walkies-backup-${Util.fmtDate(Date.now())}.json`, 'application/json');
     };
 
     document.getElementById('btn-import').onclick = () =>
@@ -403,7 +403,7 @@ const App = (() => {
       if (!f) return;
       try {
         const data = JSON.parse(await f.text());
-        if (data.app !== 'citywalk' || !data.version) throw new Error('bad');
+        if (!['citywalk', 'walkies'].includes(data.app) || !data.version) throw new Error('bad');
         for (const t of (data.tracks || [])) await DB.put('tracks', t);
         for (const p of (data.photos || [])) {
           delete p.blob;
@@ -551,7 +551,7 @@ const App = (() => {
         content: `
           <p class="modal-text">按顺序检查这三件事：</p>
           <p class="modal-text"><b>1. 是否在微信/QQ 里打开的？</b><br>内置浏览器会禁用网页定位。点右上角「···」→「在浏览器打开」，或复制链接到 Safari / Chrome 再试。</p>
-          <p class="modal-text"><b>2. iPhone</b><br>设置 → 隐私与安全性 → 定位服务 → 打开总开关，并把列表中的「Safari 网站」设为「使用 App 期间」（添加到主屏幕的显示为 Citywalk）。若之前拒绝过，改完回到本页刷新。</p>
+          <p class="modal-text"><b>2. iPhone</b><br>设置 → 隐私与安全性 → 定位服务 → 打开总开关，并把列表中的「Safari 网站」设为「使用 App 期间」（添加到主屏幕的显示为走走）。若之前拒绝过，改完回到本页刷新。</p>
           <p class="modal-text"><b>3. 安卓</b><br>点地址栏左侧的锁图标 → 权限 → 位置 → 允许，然后刷新页面。</p>`,
         actions: [{ label: '知道了', value: 'ok', className: 'btn-primary' }],
       });

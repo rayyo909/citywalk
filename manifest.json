@@ -1,7 +1,7 @@
 {
-  "name": "Citywalk 足迹",
-  "short_name": "Citywalk",
-  "description": "记录每次 Citywalk 的行走路线与照片，在地图上汇总你的城市足迹",
+  "name": "走走 Walkies",
+  "short_name": "走走",
+  "description": "记录每次行走的路线与照片，在地图上汇总你的城市足迹",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f5f6f8",

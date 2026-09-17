@@ -1,6 +1,6 @@
-# Citywalk 足迹 🚶
+# 走走 Walkies 🚶
 
-一个手机优先的 Citywalk 记录 Web 应用：记录每次行走的 GPS 轨迹，在地图上汇总所有路线；按网格统计你的「城市探索度」；上传照片自动读取拍摄位置并标注到地图上。所有数据只存在本地浏览器里，不上传任何服务器。
+一个手机优先的城市行走记录 Web 应用（项目文件夹沿用 `citywalk/`）：记录每次行走的 GPS 轨迹，在地图上汇总所有路线；按网格统计你的「城市探索度」；上传照片自动读取拍摄位置并标注到地图上。所有数据只存在本地浏览器里，不上传任何服务器。
 
 ## 功能
 
@@ -38,9 +38,7 @@ python3 -m http.server 8080
 
 ## 技术说明
 
-无构建步骤、无框架，纯原生 JavaScript + [Leaflet](https://leafletjs.com)（地图）+ [exifr](https://github.com/MikeKovarik/exifr)（EXIF 解析），两个依赖都已放在 `vendor/` 目录本地化，无需外网 CDN。
-
-```
+无构建步骤、无框架，纯原生 JavaScript + [Leaflet](https://leafletjs.com)（地图）+ [exifr](https://github.com/MikeKovarik/exifr)（EXIF 解析），两个依赖都已放在 `vendor/` 目录本地化，无需外网 CDN。```
 citywalk/
 ├── index.html        页面骨架
 ├── css/style.css     样式
