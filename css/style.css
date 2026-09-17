@@ -437,3 +437,4 @@ body {
 .modal.plain .modal-body { padding: 0; }
 .pd-img-full { display: block; width: 100%; max-height: 48dvh; object-fit: contain; background: #1B1B1B; }
 .pd-meta-v2 { padding: 10px 16px 4px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+.pd-input-wrap { padding: 10px 16px 8px; }

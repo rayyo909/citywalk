@@ -154,7 +154,7 @@ const App = (() => {
       Tracker.getState() === 'recording' ? Tracker.pause() : Tracker.resume();
     };
     document.getElementById('btn-rec-finish').onclick = onFinishClick;
-    /* 记录中随手拍：照片直接关联正在记录的路线 */
+    /* 记录中随手拍：照片直接关联正在记录的路线，拍完立即逐张输入评论 */
     document.getElementById('btn-rec-photo').onclick = () =>
       document.getElementById('file-rec-photos').click();
     document.getElementById('file-rec-photos').onchange = async e => {
@@ -165,7 +165,43 @@ const App = (() => {
       const stat = await Photos.addFiles(files, Tracker.getRecId());
       await reload();
       Util.toast(`已添加 ${stat.added} 张到本次路线 📷`);
+      if (stat.added) await commentNewPhotos(Tracker.getRecId());
     };
+  }
+
+  /* 带图评论弹窗：拍完直接写这一刻（跳过/× 继续下一张） */
+  async function commentOnePhoto(ph) {
+    const d = new Date(ph.takenAt);
+    const p2 = n => String(n).padStart(2, '0');
+    const placeStr = ph.place || (ph.lat != null ? '地址解析中…' : '');
+    const wrap = document.createElement('div');
+    wrap.innerHTML = `
+      <img class="pd-img-full" src="${Photos.url(ph)}" alt="">
+      <div class="pd-meta-v2">${p2(d.getHours())}:${p2(d.getMinutes())}${placeStr ? ' · ' + Util.esc(placeStr) : ''}</div>
+      <div class="pd-input-wrap"><input class="input" placeholder="写下这一刻…（可留空跳过）"></div>`;
+    const inp = wrap.querySelector('input');
+    const act = await Util.openModal({
+      title: '', closable: true, plain: true, content: wrap,
+      actions: [
+        { label: '跳过', value: 'skip' },
+        { label: '保存', value: 'save', className: 'btn-primary' },
+      ],
+    });
+    if (act === 'save' && inp.value.trim()) {
+      ph.comment = inp.value.trim();
+      await DB.put('photos', ph);
+    }
+  }
+
+  /* 对该路线上所有还没评论的新照片逐张弹评论 */
+  async function commentNewPhotos(trackId) {
+    const all = await DB.getAll('photos');
+    const fresh = all
+      .filter(p => p.trackId === trackId && !p.comment)
+      .sort((a, b) => a.takenAt - b.takenAt);
+    for (const ph of fresh) {
+      await commentOnePhoto(ph);
+    }
   }
 
   /* ---------- 地图页控件 ---------- */
