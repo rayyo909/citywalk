@@ -296,5 +296,5 @@ body {
 
 .hidden { display: none !important; }
 
-/* 清新底图：把瓦片柔化成浅灰调，突出路线数据 */
-.leaflet-tile-pane.cw-clean { filter: grayscale(.88) brightness(1.05) contrast(.94); }
+/* 清新底图：降低瓦片饱和度并提亮，弱化路网/POI 干扰，突出路线（保持色彩不灰暗） */
+.leaflet-tile-pane.cw-clean { filter: saturate(.5) brightness(1.16) contrast(.94); }

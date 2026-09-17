@@ -2,7 +2,7 @@
    数据一律 WGS-84，高德底图（GCJ-02）显示时自动转换 */
 const MapView = (() => {
   const DEFAULT_VIEW = [31.2304, 121.4737]; // 上海
-  let basemap = 'gaode';
+  let basemap = 'clean';
   let map = null;                 // 主地图
   const maps = [];                // 所有地图实例（含记录页）
   let groups = null;              // 主地图图层组
@@ -14,16 +14,13 @@ const MapView = (() => {
       gaode: () => L.tileLayer(
         'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
         { subdomains: '1234', maxZoom: 19, maxNativeZoom: 18, attribution: '© 高德地图' }),
-      carto: () => L.tileLayer(
-        'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-        { subdomains: 'abcd', maxZoom: 20, maxNativeZoom: 19, attribution: '© CARTO · © OpenStreetMap' }),
       osm: () => L.tileLayer(
         'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         { maxZoom: 19, attribution: '© OpenStreetMap contributors' }),
     };
   }
 
-  /* 底图取值：clean（高德柔化）/ gaode（高德标准）/ carto / osm */
+  /* 底图取值：clean（高德+白纱）/ gaode（高德标准）/ osm */
   const layerKeyOf = name => name === 'clean' ? 'gaode' : name;
   const isGaodeDisp = name => name === 'gaode' || name === 'clean';
 
@@ -32,17 +29,17 @@ const MapView = (() => {
     const defs = makeLayers();
     const osmLayer = defs.osm();
     let osmErrors = 0;
-    /* OSM 瓦片在国内网络通常无法访问，连续失败时自动切回清新模式 */
+    /* OSM 瓦片在国内网络通常无法访问，连续失败时自动切回高德 */
     osmLayer.on('tileerror', () => {
       osmErrors++;
       if (basemap === 'osm' && osmErrors >= 10) {
         osmErrors = -100000; // 防重复触发
-        Util.toast('OpenStreetMap 加载失败（国内网络通常无法访问），已切回清新底图');
+        Util.toast('OpenStreetMap 加载失败（国内网络通常无法访问），已切回高德标准');
         window.dispatchEvent(new CustomEvent('cw-osm-fallback'));
-        setBasemap('clean');
+        setBasemap('gaode');
       }
     });
-    m._cwLayers = { gaode: defs.gaode(), carto: defs.carto(), osm: osmLayer };
+    m._cwLayers = { gaode: defs.gaode(), osm: osmLayer };
     m._cwLayers[layerKeyOf(basemap)].addTo(m);
     m.getPane('tilePane').classList.toggle('cw-clean', basemap === 'clean');
     L.control.zoom({ position: 'bottomright' }).addTo(m);
@@ -61,7 +58,7 @@ const MapView = (() => {
     map.on('click', e => mapClickHandler && mapClickHandler(e));
   }
 
-  /* WGS-84 -> 当前底图显示坐标 [lat,lng] */
+  /* WGS-84 -> 当前底图显示坐标 [lat,lng]（仅高德需要 GCJ 偏移） */
   function disp(lat, lng) {
     if (isGaodeDisp(basemap) && !Geo.outOfChina(lng, lat)) {
       const g = Geo.wgs2gcj(lat, lng);

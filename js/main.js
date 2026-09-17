@@ -10,13 +10,11 @@ const App = (() => {
   } catch (e) {
     settings = { basemap: 'clean', showTracks: true, showPhotos: true, showCoverage: false, gridZoom: 15 };
   }
-  /* 旧版本设置迁移：默认底图从高德标准切到清新模式（只跑一次） */
-  if (!settings.v) {
-    if (settings.basemap === 'gaode') settings.basemap = 'clean';
-    settings.v = 2;
-  }
+  /* 底图取值仅 clean/gaode/osm，历史遗留值一律归到清新 */
+  if (!['clean', 'gaode', 'osm'].includes(settings.basemap)) settings.basemap = 'clean';
+  settings.v = 4;
   const saveSettings = () => {
-    settings.v = 2;
+    settings.v = 4;
     localStorage.setItem('cw-settings', JSON.stringify(settings));
   };
   const setRadio = v => {
@@ -152,19 +150,18 @@ const App = (() => {
   }
 
   /* ---------- 地图页控件 ---------- */
-  /* 探测瓦片服务是否可达（OSM 国内通常不通；避免切过去长时间灰屏） */
+  /* 探测瓦片服务是否可达：用 <img> 实际加载一片瓦片，与真实瓦片请求同路径、无误报 */
   function probeTile(url, timeoutMs = 4000) {
     return new Promise(resolve => {
-      const ctl = new AbortController();
-      const timer = setTimeout(() => { ctl.abort(); resolve(false); }, timeoutMs);
-      fetch(url, { method: 'HEAD', mode: 'no-cors', cache: 'no-store', signal: ctl.signal })
-        .then(() => { clearTimeout(timer); resolve(true); })
-        .catch(() => { clearTimeout(timer); resolve(false); });
+      const img = new Image();
+      const timer = setTimeout(() => { img.src = ''; resolve(false); }, timeoutMs);
+      img.onload = () => { clearTimeout(timer); resolve(true); };
+      img.onerror = () => { clearTimeout(timer); resolve(false); };
+      img.src = url + (url.includes('?') ? '&' : '?') + '_=' + Date.now();
     });
   }
   const PROBE_URLS = {
     osm: 'https://a.tile.openstreetmap.org/12/3370/1698.png',
-    carto: 'https://a.basemaps.cartocdn.com/light_all/12/3370/1698.png',
   };
 
   function bindMapControls() {
@@ -180,8 +177,10 @@ const App = (() => {
         if (PROBE_URLS[r.value]) {
           Util.toast('正在测试该底图连通性…', 4000);
           if (!(await probeTile(PROBE_URLS[r.value]))) {
-            setRadio('clean');
-            Util.toast('此底图当前无法连接，已切回清新模式');
+            settings.basemap = 'gaode';
+            saveSettings();
+            setRadio('gaode');
+            Util.toast('此底图当前无法连接，已切回高德标准');
             return;
           }
         }
@@ -544,15 +543,15 @@ const App = (() => {
     await reload();
     if (restored) Util.toast('已恢复上次未完成的路线（已暂停），可到「记录」页继续');
 
-    /* 启动时恢复已保存的底图（OSM/CARTO 先探测可达性，不通则退回清新模式） */
+    /* 启动时恢复已保存的底图（非高德系先探测可达性，不通则退回高德标准） */
     if (MapView.basemapName() !== settings.basemap) {
       if (PROBE_URLS[settings.basemap]) {
         probeTile(PROBE_URLS[settings.basemap]).then(ok => {
           if (ok) { MapView.setBasemap(settings.basemap); renderAll(); }
           else {
-            settings.basemap = 'clean';
+            settings.basemap = 'gaode';
             saveSettings();
-            setRadio('clean');
+            setRadio('gaode');
           }
         });
       } else {
@@ -571,11 +570,11 @@ const App = (() => {
       });
     });
 
-    /* OSM 瓦片不可达时 mapView 会切回清新模式并触发此事件，同步设置和界面 */
+    /* 底图不可达时 mapView 会触发此事件，同步设置和界面 */
     window.addEventListener('cw-osm-fallback', () => {
-      settings.basemap = 'clean';
+      settings.basemap = 'gaode';
       saveSettings();
-      setRadio('clean');
+      setRadio('gaode');
       renderAll();
     });
   }
