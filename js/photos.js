@@ -50,8 +50,8 @@ const Photos = (() => {
     return fallback;
   }
 
-  /* 批量入库，返回 {added, noGps, failed} */
-  async function addFiles(files) {
+  /* 批量入库，trackId 可空（记录中/详情页上传时带上即归属该路线），返回 {added, noGps, failed} */
+  async function addFiles(files, trackId = null) {
     const stat = { added: 0, noGps: 0, failed: 0 };
     for (const file of files) {
       try {
@@ -74,6 +74,8 @@ const Photos = (() => {
           blob: file,
           size: file.size,
           createdAt: Date.now(),
+          trackId,
+          comment: '',
         };
         await DB.put('photos', ph);
         stat.added++;

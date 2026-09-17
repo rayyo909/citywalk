@@ -1,4 +1,4 @@
-/* 应用主逻辑：页面路由、路线/照片管理、记录流程、数据导入导出 */
+/* 应用主逻辑：页面导航、GO 记录、路线列表/详情、照片（路线关联/评论/标注）、导入导出 */
 const App = (() => {
   let tracks = [], photos = [];
 
@@ -21,6 +21,20 @@ const App = (() => {
     const r = document.querySelector(`input[name=basemap][value="${v}"]`);
     if (r) r.checked = true;
   };
+
+  /* ---------- 页面导航 ---------- */
+  function showPage(name) {
+    document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
+    if (name === 'map') setTimeout(() => MapView.invalidate(), 60);
+    if (name === 'record') {
+      ensureRecMap();
+      setTimeout(() => recMap && recMap.invalidateSize(), 60);
+    }
+  }
+  function activePage() {
+    const el = document.querySelector('.page.active');
+    return el ? el.id.replace('page-', '') : 'map';
+  }
 
   /* ---------- 记录页实时地图 ---------- */
   let recMap = null, liveLine = null, liveDot = null, lastPanT = 0;
@@ -67,8 +81,15 @@ const App = (() => {
     document.getElementById('btn-rec-start').classList.toggle('hidden', !idle);
     document.getElementById('btn-rec-pause').classList.toggle('hidden', idle);
     document.getElementById('btn-rec-finish').classList.toggle('hidden', idle);
+    document.getElementById('btn-rec-photo').classList.toggle('hidden', idle);
     document.getElementById('btn-rec-pause').textContent =
       s.state === 'recording' ? '暂停' : '继续';
+
+    /* GO 按钮状态 */
+    const go = document.getElementById('btn-go');
+    go.classList.toggle('recording', !idle);
+    go.querySelector('.go-label').textContent =
+      idle ? 'GO' : (s.state === 'recording' ? '记录中' : '已暂停');
 
     updateLive(s);
   }
@@ -102,7 +123,7 @@ const App = (() => {
     });
     if (act === 'resume') { Tracker.resume(); return; }
     if (act === 'discard') {
-      if (await Util.confirmModal('放弃路线', '放弃后本次记录的轨迹将被删除。', '放弃', true)) Tracker.discard();
+      if (await Util.confirmModal('放弃路线', '放弃后本次记录的轨迹将被删除（已拍的照片保留为未归类）。', '放弃', true)) Tracker.discard();
       return;
     }
     if (act === 'save') {
@@ -110,47 +131,44 @@ const App = (() => {
       tr.name = inp.value.trim() || defaultName(tr.startTime);
       await DB.put('tracks', tr);
       await reload();
-      switchTab('map');
+      showPage('map');
       MapView.flyToTrack(tr);
       Util.toast('路线已保存 🎉');
     }
   }
 
+  function centerRecMapOnce() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        if (recMap && Tracker.snapshot().pointCount < 3) {
+          const [la, ln] = MapView.disp(pos.coords.latitude, pos.coords.longitude);
+          recMap.setView([la, ln], 16);
+        }
+      }, () => { }, { enableHighAccuracy: true, timeout: 8000 });
+    }
+  }
+
   function bindRecordUI() {
-    document.getElementById('btn-rec-start').onclick = () => {
-      Tracker.start();
-      // 尚未有轨迹点时，先一次性定位把实时地图居中
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-          if (recMap && Tracker.snapshot().pointCount < 3) {
-            const [la, ln] = MapView.disp(pos.coords.latitude, pos.coords.longitude);
-            recMap.setView([la, ln], 16);
-          }
-        }, () => { }, { enableHighAccuracy: true, timeout: 8000 });
-      }
-    };
+    document.getElementById('btn-rec-start').onclick = () => { Tracker.start(); centerRecMapOnce(); };
     document.getElementById('btn-rec-pause').onclick = () => {
       Tracker.getState() === 'recording' ? Tracker.pause() : Tracker.resume();
     };
     document.getElementById('btn-rec-finish').onclick = onFinishClick;
-  }
-
-  /* ---------- 页面切换 ---------- */
-  function switchTab(page) {
-    Util.$$('.tab').forEach(b => b.classList.toggle('active', b.dataset.page === page));
-    Util.$$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
-    if (page === 'map') setTimeout(() => MapView.invalidate(), 60);
-    if (page === 'record') {
-      ensureRecMap();
-      setTimeout(() => recMap && recMap.invalidateSize(), 60);
-    }
-  }
-  function bindTabs() {
-    Util.$$('.tab').forEach(b => b.onclick = () => switchTab(b.dataset.page));
+    /* 记录中随手拍：照片直接关联正在记录的路线 */
+    document.getElementById('btn-rec-photo').onclick = () =>
+      document.getElementById('file-rec-photos').click();
+    document.getElementById('file-rec-photos').onchange = async e => {
+      const files = [...e.target.files];
+      e.target.value = '';
+      if (!files.length) return;
+      Util.toast(`正在处理 ${files.length} 张照片…`, 8000);
+      const stat = await Photos.addFiles(files, Tracker.getRecId());
+      await reload();
+      Util.toast(`已添加 ${stat.added} 张到本次路线 📷`);
+    };
   }
 
   /* ---------- 地图页控件 ---------- */
-  /* 探测瓦片服务是否可达：用 <img> 实际加载一片瓦片，与真实瓦片请求同路径、无误报 */
   function probeTile(url, timeoutMs = 4000) {
     return new Promise(resolve => {
       const img = new Image();
@@ -206,43 +224,179 @@ const App = (() => {
     ckP.onchange = e => { settings.showPhotos = e.target.checked; saveSettings(); renderAll(); };
     ckC.onchange = e => { settings.showCoverage = e.target.checked; saveSettings(); renderCoverageLayer(); };
     selG.onchange = e => { settings.gridZoom = +e.target.value; saveSettings(); renderCoverageLayer(); };
-
-    document.getElementById('sheet-toggle').onclick = () =>
-      document.getElementById('tracks-sheet').classList.toggle('open');
   }
 
   function renderCoverageLayer() {
-    const chip = document.getElementById('coverage-chip');
-    if (!settings.showCoverage) { MapView.clearCoverage(); chip.classList.add('hidden'); return; }
+    if (!settings.showCoverage) { MapView.clearCoverage(); return; }
     const cov = Coverage.compute(tracks, settings.gridZoom);
     MapView.renderCoverage(cov);
-    chip.classList.remove('hidden');
-    chip.textContent = `🎯 已探索 ${cov.set.size} 格 · 约 ${Coverage.areaKm2(cov).toFixed(1)} km²` +
-      (cov.truncated ? '（部分已省略）' : '');
   }
 
-  /* ---------- 路线列表 ---------- */
-  function renderTrackList() {
-    const list = document.getElementById('track-list');
-    document.getElementById('sheet-title').textContent = `路线（${tracks.length}）`;
+  /* ---------- 路线列表页 ---------- */
+  function photoCountOf(trackId) {
+    return photos.filter(p => p.trackId === trackId).length;
+  }
+
+  function renderTracksPage() {
+    const box = document.getElementById('tracks-list-page');
+    document.getElementById('tracks-count').textContent = tracks.length ? `(${tracks.length})` : '';
     if (!tracks.length) {
-      list.innerHTML = '<div class="sheet-empty">还没有路线，去「记录」页出去走走吧</div>';
-      return;
+      box.innerHTML = '<div class="tracks-empty">还没有路线<br>回到地图，点中间的 GO 开始第一次行走吧</div>';
+    } else {
+      box.innerHTML = tracks.map((tr, i) => {
+        const n = photoCountOf(tr.id);
+        return `<div class="tracks-row" data-id="${tr.id}">
+          <span class="track-dot" style="background:${MapView.trackColor(i)}"></span>
+          <div class="ti-main">
+            <div class="ti-name ellipsis">${Util.esc(tr.name)}</div>
+            <div class="ti-sub">${Util.fmtDate(tr.startTime)} · ${Geo.fmtDist(tr.distance)} · ${Geo.fmtDur(tr.activeMs)}</div>
+          </div>
+          ${n ? `<span class="ti-photo">📷 ${n}</span>` : ''}
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)"><path d="M9 5l7 7-7 7"/></svg>
+        </div>`;
+      }).join('');
     }
-    list.innerHTML = tracks.map((tr, i) => `
-      <div class="track-item" data-id="${tr.id}">
-        <span class="track-dot" style="background:${MapView.trackColor(i)}"></span>
-        <div class="ti-main">
-          <div class="ti-name">${Util.esc(tr.name)}</div>
-          <div class="ti-sub">${Util.fmtDate(tr.startTime)} · ${Geo.fmtDist(tr.distance)} · ${Geo.fmtDur(tr.activeMs)}</div>
-        </div>
-        <div class="ti-actions">
-          <button class="ti-btn" data-act="rename" title="重命名"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
-          <button class="ti-btn" data-act="gpx" title="导出 GPX"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 11l5 5 5-5M5 20h14"/></svg></button>
-          <button class="ti-btn" data-act="del" title="删除"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2m-8 0 1 13h8l1-13"/></svg></button>
-        </div>
+    renderOrphans();
+  }
+
+  function renderOrphans() {
+    const card = document.getElementById('orphan-card');
+    const trackIds = new Set(tracks.map(t => t.id));
+    const orphans = photos.filter(p => !p.trackId || !trackIds.has(p.trackId));
+    card.classList.toggle('hidden', !orphans.length);
+    if (!orphans.length) return;
+    document.getElementById('orphan-count').textContent = `(${orphans.length})`;
+    const grid = document.getElementById('orphan-grid');
+    grid.innerHTML = orphans.map(ph => `
+      <div class="pg-item" data-id="${ph.id}">
+        ${ph.thumb ? `<img src="${ph.thumb}" loading="lazy" alt="">` : ''}
+        ${ph.lat == null ? '<span class="pg-badge">无位置</span>' : ''}
       </div>`).join('');
   }
+
+  function bindTracksPage() {
+    document.getElementById('tracks-list-page').onclick = e => {
+      const row = e.target.closest('.tracks-row');
+      if (!row) return;
+      const idx = tracks.findIndex(t => t.id === row.dataset.id);
+      if (idx < 0) return;
+      TrackDetail.open(tracks[idx], idx);
+    };
+    document.getElementById('orphan-grid').onclick = e => {
+      const item = e.target.closest('.pg-item');
+      if (!item) return;
+      const ph = photos.find(p => p.id === item.dataset.id);
+      if (ph) openPhoto(ph);
+    };
+  }
+
+  /* ---------- 统计条 ---------- */
+  function fmtHhMm(ms) {
+    const m = Math.round(ms / 60000);
+    return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
+  }
+  function renderStatBar() {
+    const ms = tracks.reduce((s, t) => s + (t.activeMs || 0), 0);
+    const km = tracks.reduce((s, t) => s + (t.distance || 0), 0) / 1000;
+    const area = tracks.length ? Coverage.areaKm2(Coverage.compute(tracks, 15)) : 0;
+    document.getElementById('stat-bar').innerHTML =
+      `⏱ <b>${fmtHhMm(ms)}</b>&nbsp; ↗ <b>${km.toFixed(1)}</b> km &nbsp; ▦ <b>${area.toFixed(1)}</b> km²`;
+  }
+
+  /* ---------- 照片详情弹窗（评论/删除/标注） ---------- */
+  async function openPhoto(ph, refresh) {
+    const content = document.createElement('div');
+    const pos = ph.lat != null ? `${ph.lat.toFixed(5)}, ${ph.lng.toFixed(5)}` : '未标注位置';
+    content.innerHTML = `
+      <img class="pd-img" src="${Photos.url(ph)}" alt="">
+      <div class="pd-name">${Util.esc(ph.name)}</div>
+      <div class="pd-meta">${Util.fmtDateTime(ph.takenAt)}<br>${pos}${ph.comment ? '<br>💬 ' + Util.esc(ph.comment) : ''}</div>`;
+    const act = await Util.openModal({
+      title: '照片',
+      content,
+      actions: [
+        { label: '关闭', value: 'close' },
+        { label: '评论', value: 'comment' },
+        { label: '删除', value: 'del', className: 'btn-danger-ghost' },
+        { label: ph.lat != null ? '改位置' : '标注位置', value: 'place', className: 'btn-primary' },
+      ],
+    });
+    if (act === 'comment') {
+      const c = await Util.promptModal('照片评论', { value: ph.comment || '', placeholder: '写下这一刻…' });
+      if (c !== null) {
+        ph.comment = c;
+        await DB.put('photos', ph);
+        await reload();
+        refresh && refresh();
+      }
+    } else if (act === 'del') {
+      if (await Util.confirmModal('删除照片', '删除后无法恢复。', '删除', true)) {
+        await DB.del('photos', ph.id);
+        Photos.revoke(ph.id);
+        await reload();
+        refresh && refresh();
+      }
+    } else if (act === 'place') {
+      startPlacing(ph);
+    }
+  }
+
+  /* 手动标注照片位置：进入点选模式，点地图放置 */
+  let placing = null;
+  function startPlacing(ph) {
+    placing = ph.id;
+    showPage('map');
+    document.getElementById('placing-text').textContent = `点击地图放置「${ph.name}」的拍摄位置`;
+    document.getElementById('placing-banner').classList.remove('hidden');
+  }
+  function cancelPlacing() {
+    placing = null;
+    document.getElementById('placing-banner').classList.add('hidden');
+  }
+
+  function bindPhotosUI() {
+    document.getElementById('placing-cancel').onclick = cancelPlacing;
+    MapView.onClick(async e => {
+      if (!placing) return;
+      const ph = photos.find(p => p.id === placing);
+      cancelPlacing();
+      if (!ph) return;
+      const { lat, lng } = MapView.toWgs(e.latlng.lat, e.latlng.lng);
+      ph.lat = lat; ph.lng = lng;
+      await DB.put('photos', ph);
+      await reload();
+      Util.toast('已标注位置 📍');
+    });
+    MapView.onPhotoClick(ph => openPhoto(ph));
+  }
+
+  /* ---------- 备份提醒 ---------- */
+  function updateBackupStatus() {
+    const el = document.getElementById('backup-status');
+    if (!el) return;
+    const last = +(localStorage.getItem('cw-last-backup') || 0);
+    const stale = !last || Date.now() - last > 7 * 86400000;
+    el.textContent = last
+      ? `上次备份：${Util.fmtDateTime(last)}` + (stale ? ' · 已超过 7 天，建议重新导出' : '')
+      : '数据只保存在本机（卸载/删除主屏幕图标会被清空），建议尽快导出一份备份';
+    el.classList.toggle('stale', stale && tracks.length > 0);
+  }
+  function maybeRemindBackup() {
+    if (!tracks.length) return;
+    if (sessionStorage.getItem('cw-backup-reminded')) return;
+    const last = +(localStorage.getItem('cw-last-backup') || 0);
+    if (last && Date.now() - last < 7 * 86400000) return;
+    sessionStorage.setItem('cw-backup-reminded', '1');
+    Util.toast('数据仅存本机，建议到「设置 → 导出全部数据」做备份', 4500);
+  }
+
+  /* ---------- 设置页 ---------- */
+  const blobToDataURL = b => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(b);
+  });
 
   function exportTrackGPX(tr) {
     const pts = tr.points.map(p =>
@@ -277,146 +431,6 @@ const App = (() => {
     await DB.put('tracks', track);
     return track;
   }
-
-  function bindTrackList() {
-    document.getElementById('track-list').onclick = async e => {
-      const item = e.target.closest('.track-item');
-      if (!item) return;
-      const tr = tracks.find(t => t.id === item.dataset.id);
-      if (!tr) return;
-      const btn = e.target.closest('.ti-btn');
-      if (!btn) { switchTab('map'); MapView.flyToTrack(tr); return; }
-      const act = btn.dataset.act;
-      if (act === 'rename') {
-        const name = await Util.promptModal('重命名路线', { value: tr.name });
-        if (name) { tr.name = name; await DB.put('tracks', tr); renderAll(); }
-      } else if (act === 'gpx') {
-        exportTrackGPX(tr);
-      } else if (act === 'del') {
-        if (await Util.confirmModal('删除路线', `删除「${tr.name}」后无法恢复。`, '删除', true)) {
-          await DB.del('tracks', tr.id);
-          await reload();
-        }
-      }
-    };
-  }
-
-  /* ---------- 照片 ---------- */
-  function renderPhotoGrid() {
-    const grid = document.getElementById('photo-grid');
-    document.getElementById('photo-count').textContent = photos.length ? `(${photos.length})` : '';
-    document.getElementById('photo-hint').classList.toggle('hidden', photos.length > 0);
-    if (!photos.length) {
-      grid.innerHTML = '<div class="photo-empty">还没有照片，点右上角「＋ 添加照片」</div>';
-      return;
-    }
-    grid.innerHTML = photos.map(ph => `
-      <div class="pg-item" data-id="${ph.id}">
-        ${ph.thumb ? `<img src="${ph.thumb}" alt="" loading="lazy">` : ''}
-        ${ph.lat == null ? '<span class="pg-badge">无位置</span>' : ''}
-      </div>`).join('');
-  }
-
-  async function openPhotoDetail(ph) {
-    const content = document.createElement('div');
-    content.innerHTML = `
-      <img class="pd-img" src="${Photos.url(ph)}" alt="">
-      <div class="pd-name">${Util.esc(ph.name)}</div>
-      <div class="pd-meta">${Util.fmtDateTime(ph.takenAt)}<br>${
-        ph.lat != null ? `${ph.lat.toFixed(5)}, ${ph.lng.toFixed(5)}` : '未标注位置'}</div>`;
-    const act = await Util.openModal({
-      title: '照片',
-      content,
-      actions: [
-        { label: '关闭', value: 'close' },
-        { label: '删除', value: 'del', className: 'btn-danger-ghost' },
-        { label: ph.lat != null ? '修改位置' : '在地图上标注', value: 'place', className: 'btn-primary' },
-      ],
-    });
-    if (act === 'del') {
-      if (await Util.confirmModal('删除照片', '删除后无法恢复。', '删除', true)) {
-        await DB.del('photos', ph.id);
-        Photos.revoke(ph.id);
-        await reload();
-      }
-    } else if (act === 'place') {
-      startPlacing(ph);
-    }
-  }
-
-  /* 手动标注照片位置：进入点选模式，点地图放置 */
-  let placing = null;
-  function startPlacing(ph) {
-    placing = ph.id;
-    switchTab('map');
-    document.getElementById('placing-text').textContent = `点击地图放置「${ph.name}」的拍摄位置`;
-    document.getElementById('placing-banner').classList.remove('hidden');
-  }
-  function cancelPlacing() {
-    placing = null;
-    document.getElementById('placing-banner').classList.add('hidden');
-  }
-
-  function bindPhotosUI() {
-    document.getElementById('btn-add-photo').onclick = () =>
-      document.getElementById('file-photos').click();
-    document.getElementById('file-photos').onchange = async e => {
-      const files = [...e.target.files];
-      e.target.value = '';
-      if (!files.length) return;
-      Util.toast(`正在处理 ${files.length} 张照片…`, 8000);
-      const stat = await Photos.addFiles(files);
-      await reload();
-      Util.toast(`已添加 ${stat.added} 张照片` + (stat.noGps ? `（${stat.noGps} 张无位置，可手动标注）` : ''));
-    };
-    document.getElementById('photo-grid').onclick = e => {
-      const item = e.target.closest('.pg-item');
-      if (!item) return;
-      const ph = photos.find(p => p.id === item.dataset.id);
-      if (ph) openPhotoDetail(ph);
-    };
-    document.getElementById('placing-cancel').onclick = cancelPlacing;
-    MapView.onClick(async e => {
-      if (!placing) return;
-      const ph = photos.find(p => p.id === placing);
-      cancelPlacing();
-      if (!ph) return;
-      const { lat, lng } = MapView.toWgs(e.latlng.lat, e.latlng.lng);
-      ph.lat = lat; ph.lng = lng;
-      await DB.put('photos', ph);
-      await reload();
-      Util.toast('已标注位置 📍');
-    });
-    MapView.onPhotoClick(openPhotoDetail);
-  }
-
-  /* ---------- 备份提醒：iOS 删除主屏幕图标会连带清空本地数据，定期导出以防丢失 ---------- */
-  function updateBackupStatus() {
-    const el = document.getElementById('backup-status');
-    if (!el) return;
-    const last = +(localStorage.getItem('cw-last-backup') || 0);
-    const stale = !last || Date.now() - last > 7 * 86400000;
-    el.textContent = last
-      ? `上次备份：${Util.fmtDateTime(last)}` + (stale ? ' · 已超过 7 天，建议重新导出' : '')
-      : '数据只保存在本机（卸载/删除主屏幕图标会被清空），建议尽快导出一份备份';
-    el.classList.toggle('stale', stale && tracks.length > 0);
-  }
-  function maybeRemindBackup() {
-    if (!tracks.length) return;
-    if (sessionStorage.getItem('cw-backup-reminded')) return;
-    const last = +(localStorage.getItem('cw-last-backup') || 0);
-    if (last && Date.now() - last < 7 * 86400000) return;
-    sessionStorage.setItem('cw-backup-reminded', '1');
-    Util.toast('数据仅存本机，建议到「设置 → 导出全部数据」做备份', 4500);
-  }
-
-  /* ---------- 设置页 ---------- */
-  const blobToDataURL = b => new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result);
-    r.onerror = rej;
-    r.readAsDataURL(b);
-  });
 
   function bindSettingsUI() {
     document.getElementById('btn-export').onclick = async () => {
@@ -465,7 +479,7 @@ const App = (() => {
       try {
         const tr = await importGPX(f);
         await reload();
-        switchTab('map');
+        showPage('map');
         MapView.flyToTrack(tr);
         Util.toast('GPX 路线已导入');
       } catch (err) {
@@ -528,40 +542,52 @@ const App = (() => {
       });
     }
     await reload();
-    switchTab('map');
+    showPage('map');
     MapView.fitAll(tracks, photos);
     Util.toast('已生成 3 条示例路线');
   }
 
   /* ---------- 汇总渲染 ---------- */
-  function renderHeaderStats() {
-    const km = tracks.reduce((s, t) => s + (t.distance || 0), 0);
-    document.getElementById('header-stats').innerHTML =
-      `${tracks.length} 条路线<br>${(km / 1000).toFixed(1)} km · ${photos.length} 张照片`;
-  }
-
   function renderAll() {
     MapView.renderTracks(settings.showTracks ? tracks : []);
     MapView.renderPhotos(settings.showPhotos ? photos : []);
     renderCoverageLayer();
-    renderTrackList();
-    renderPhotoGrid();
-    renderHeaderStats();
+    renderTracksPage();
+    renderStatBar();
   }
 
   async function reload() {
     tracks = (await DB.getAll('tracks')).sort((a, b) => b.startTime - a.startTime);
     photos = (await DB.getAll('photos')).sort((a, b) => b.takenAt - a.takenAt);
     renderAll();
+    updateBackupStatus();
+    TrackDetail.refreshPhotos();
   }
 
   /* ---------- 启动 ---------- */
   async function init() {
     MapView.init('map');
-    bindTabs();
+    TrackDetail.init();
+
+    /* 导航 */
+    document.querySelectorAll('[data-back]').forEach(b => b.onclick = () => showPage('map'));
+    document.getElementById('btn-switch').onclick = () => showPage('tracks');
+    document.getElementById('btn-avatar').onclick = () => showPage('settings');
+
+    /* GO：空闲=开始记录并进入记录页；记录中=回到记录页 */
+    document.getElementById('btn-go').onclick = () => {
+      if (Tracker.getState() === 'idle') {
+        showPage('record');
+        Tracker.start();
+        centerRecMapOnce();
+      } else {
+        showPage('record');
+      }
+    };
+
     bindMapControls();
     bindRecordUI();
-    bindTrackList();
+    bindTracksPage();
     bindPhotosUI();
     bindSettingsUI();
     Tracker.onChange(renderRecordUI);
@@ -570,11 +596,12 @@ const App = (() => {
     });
     const restored = Tracker.restore();
     await reload();
-    if (restored) Util.toast('已恢复上次未完成的路线（已暂停），可到「记录」页继续');
+    renderRecordUI(Tracker.snapshot());
+    if (restored) Util.toast('已恢复上次未完成的路线（已暂停），点 GO 继续');
     updateBackupStatus();
     maybeRemindBackup();
 
-    /* 启动时恢复已保存的底图（非高德系先探测可达性，不通则退回高德标准） */
+    /* 启动时恢复已保存的底图（OSM 先探测可达性，不通则退回高德标准） */
     if (MapView.basemapName() !== settings.basemap) {
       if (PROBE_URLS[settings.basemap]) {
         probeTile(PROBE_URLS[settings.basemap]).then(ok => {
@@ -589,6 +616,7 @@ const App = (() => {
         MapView.setBasemap(settings.basemap);
       }
     }
+
     window.addEventListener('cw-geo-denied', () => {
       Util.openModal({
         title: '无法获取定位权限',
@@ -601,7 +629,7 @@ const App = (() => {
       });
     });
 
-    /* 底图不可达时 mapView 会触发此事件，同步设置和界面 */
+    /* OSM 瓦片不可达时 mapView 会切回高德并触发此事件，同步设置和界面 */
     window.addEventListener('cw-osm-fallback', () => {
       settings.basemap = 'gaode';
       saveSettings();
@@ -610,7 +638,10 @@ const App = (() => {
     });
   }
 
-  return { init, reload, switchTab };
+  return {
+    init, reload, showPage, openPhoto, exportTrackGPX,
+    get tracks() { return tracks; },
+  };
 })();
 
 document.addEventListener('DOMContentLoaded', () => App.init());

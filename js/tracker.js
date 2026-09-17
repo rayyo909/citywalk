@@ -12,12 +12,14 @@ const Tracker = (() => {
   let lastAcc = null, statusMsg = '';
   let persistTimer = null;
   let lastDeniedEvt = 0;
+  let recId = null; /* 路线 id 在开始记录时就生成，照片可提前关联 */
 
   const listeners = new Set();
 
   function snapshot() {
     return {
       state,
+      recId,
       distance,
       activeMs: activeMs + (state === 'recording' ? Date.now() - activeStart : 0),
       pointCount: points.length,
@@ -78,6 +80,7 @@ const Tracker = (() => {
     if (state !== 'idle') return;
     points = []; distance = 0; activeMs = 0; startTime = Date.now();
     lastAcc = null; statusMsg = '';
+    recId = Util.uid();
     state = 'recording'; activeStart = Date.now();
     watch(); reWake(); persist();
     emit();
@@ -99,7 +102,7 @@ const Tracker = (() => {
     unwatch(); releaseWake();
     localStorage.removeItem(STORE_KEY);
     const track = {
-      id: Util.uid(),
+      id: recId || Util.uid(),
       name: '',
       startTime,
       endTime: Date.now(),
@@ -107,7 +110,7 @@ const Tracker = (() => {
       distance: Math.round(distance),
       points: points.slice(),
     };
-    state = 'idle'; points = []; distance = 0; activeMs = 0; lastAcc = null; statusMsg = '';
+    state = 'idle'; points = []; distance = 0; activeMs = 0; lastAcc = null; statusMsg = ''; recId = null;
     emit();
     return track;
   }
@@ -115,7 +118,7 @@ const Tracker = (() => {
     if (state === 'idle') return;
     unwatch(); releaseWake();
     localStorage.removeItem(STORE_KEY);
-    state = 'idle'; points = []; distance = 0; activeMs = 0; lastAcc = null; statusMsg = '';
+    state = 'idle'; points = []; distance = 0; activeMs = 0; lastAcc = null; statusMsg = ''; recId = null;
     emit();
   }
 
@@ -123,7 +126,7 @@ const Tracker = (() => {
   function persist() {
     if (state === 'idle') return;
     try {
-      localStorage.setItem(STORE_KEY, JSON.stringify({ points, startTime, activeMs, distance }));
+      localStorage.setItem(STORE_KEY, JSON.stringify({ points, startTime, activeMs, distance, recId }));
     } catch (e) { /* 存储满则忽略 */ }
   }
   function schedulePersist() {
@@ -137,6 +140,7 @@ const Tracker = (() => {
       const d = JSON.parse(raw);
       if (!d.points || !d.points.length) { localStorage.removeItem(STORE_KEY); return false; }
       points = d.points; startTime = d.startTime; activeMs = d.activeMs || 0; distance = d.distance || 0;
+      recId = d.recId || Util.uid();
       state = 'paused';
       emit();
       return true;
@@ -161,6 +165,7 @@ const Tracker = (() => {
     start, pause, resume, finishTrack, discard, restore,
     onChange: f => listeners.add(f),
     getState: () => state,
+    getRecId: () => recId,
     snapshot,
   };
 })();
