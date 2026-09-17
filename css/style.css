@@ -19,7 +19,7 @@ html, body { height: 100%; }
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Segoe UI", sans-serif;
-  background: #E9E4DE;
+  background: #E8E2D9; /* 与地图底色一致：极端情况下露出 1-2px 也不突兀 */
   color: var(--text);
   overscroll-behavior: none;
 }

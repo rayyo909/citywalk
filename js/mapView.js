@@ -171,11 +171,12 @@ const MapView = (() => {
   }
 
   function invalidate() { map && map.invalidateSize(); }
+  function invalidateAll() { maps.forEach(m => m.invalidateSize()); }
 
   return {
     init, createMap, disp, toWgs, setBasemap, basemapName, trackColor: palette,
     renderTracks, renderPhotos, renderCoverage, clearCoverage,
-    fitAll, flyToTrack, locate, invalidate,
+    fitAll, flyToTrack, locate, invalidate, invalidateAll,
     onClick: f => mapClickHandler = f,
     onPhotoClick: f => photoClickHandler = f,
   };

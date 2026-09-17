@@ -622,6 +622,21 @@ const App = (() => {
     const restored = Tracker.restore();
     await reload();
     renderRecordUI(Tracker.snapshot());
+
+    /* iOS Safari 地址栏收展时可视高度变化，同步容器高度保持全屏贴合（仅手机，桌面由 CSS 控制） */
+    if (window.visualViewport) {
+      const vv = window.visualViewport;
+      const appEl = document.getElementById('app');
+      const isDesktop = () => window.matchMedia('(min-width: 600px)').matches;
+      const fitVp = () => {
+        if (isDesktop()) { appEl.style.height = ''; return; }
+        appEl.style.height = vv.height + 'px';
+        setTimeout(() => MapView.invalidateAll(), 120);
+      };
+      vv.addEventListener('resize', fitVp);
+      fitVp();
+    }
+
     if (restored) Util.toast('已恢复上次未完成的路线（已暂停），点 GO 继续');
     updateBackupStatus();
     maybeRemindBackup();
