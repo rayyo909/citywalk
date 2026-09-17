@@ -91,7 +91,7 @@ const TrackDetail = (() => {
       const timeStr = `${p2(t.getHours())}:${p2(t.getMinutes())}`;
       const posStr = ph.place
         ? Util.esc(ph.place)
-        : (ph.lat != null ? '地址解析中…' : '未标注位置');
+        : (ph.lat != null ? (ph._placeTried ? '已定位' : '地址解析中…') : '未标注位置');
       const cmt = ph.comment
         ? `<div class="fm-comment">${Util.esc(ph.comment)}</div>`
         : '<div class="fm-comment placeholder">点击添加评论…</div>';
@@ -124,8 +124,12 @@ const TrackDetail = (() => {
     photos = all.filter(p => p.trackId === track.id).sort((a, b) => b.takenAt - a.takenAt);
     renderPins();
     renderFalls();
-    /* 缺地名的照片异步补全（Photon 逆地理），完成后刷新展示 */
-    Photos.ensurePlaces(photos, () => { renderPins(); renderFalls(); });
+    /* 缺地名的照片异步补全（Photon 逆地理），失败后显示"已定位"兜底 */
+    Photos.ensurePlaces(photos, () => {
+      photos.forEach(p => { if (p.lat != null && !p.place) p._placeTried = true; });
+      renderPins();
+      renderFalls();
+    });
   }
 
   /* 入口：tr 为路线对象，colorIdx 用于与首页同色 */
@@ -169,9 +173,14 @@ const TrackDetail = (() => {
       if (!files.length) return;
       Util.toast(`正在处理 ${files.length} 张照片…`, 8000);
       const stat = await Photos.addFiles(files, track.id);
+      /* 无 EXIS 位置的照片按拍摄时间在轨迹上回填位置 */
+      const allNow = await DB.getAll('photos');
+      const located = await Photos.locatePhotosOnTrack(
+        track, allNow.filter(p => p.trackId === track.id));
       await refreshPhotos();
       App.reload();
-      Util.toast(`已添加 ${stat.added} 张照片` + (stat.noGps ? `（${stat.noGps} 张无位置，可点照片手动标注）` : ''));
+      Util.toast(`已添加 ${stat.added} 张照片` +
+        (located ? `，${located} 张已按轨迹定位` : (stat.noGps ? '（无位置信息）' : '')));
     };
     document.getElementById('detail-falls').onclick = e => {
       const card = e.target.closest('.fall-card');

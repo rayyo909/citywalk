@@ -130,6 +130,8 @@ const App = (() => {
       const tr = Tracker.finishTrack();
       tr.name = inp.value.trim() || defaultName(tr.startTime);
       await DB.put('tracks', tr);
+      /* 记录中拍的照片按拍摄时间在轨迹上回填位置（iOS 剥 EXIF GPS 的兜底） */
+      await Photos.locatePhotosOnTrack(tr, photos.filter(p => p.trackId === tr.id));
       await reload();
       showPage('map');
       MapView.flyToTrack(tr);

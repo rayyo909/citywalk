@@ -127,5 +127,39 @@ const Photos = (() => {
     onChange && onChange();
   }
 
-  return { url, revoke, addFiles, makeThumb, resolvePlace, ensurePlaces };
+  /* 按时间在轨迹上插值出位置（走路时拍的照片，拍摄时刻必然在轨迹上） */
+  function posAtTime(track, t) {
+    const pts = track.points;
+    if (!pts || !pts.length) return null;
+    if (t <= pts[0].t) return { lat: pts[0].lat, lng: pts[0].lng };
+    const lastP = pts[pts.length - 1];
+    if (t >= lastP.t) return { lat: lastP.lat, lng: lastP.lng };
+    for (let i = 1; i < pts.length; i++) {
+      if (pts[i].t >= t) {
+        const a = pts[i - 1], b = pts[i];
+        const f = (t - a.t) / Math.max(1, b.t - a.t);
+        return { lat: a.lat + (b.lat - a.lat) * f, lng: a.lng + (b.lng - a.lng) * f };
+      }
+    }
+    return null;
+  }
+
+  /* 给路线上无位置的照片按拍摄时间回填轨迹位置（iOS Safari 会剥 EXIF GPS，此法不依赖 EXIF）。
+     时间容差 15 分钟；返回回填数量 */
+  async function locatePhotosOnTrack(track, list) {
+    if (!track || !track.points || !track.points.length) return 0;
+    const tol = 15 * 60000;
+    let n = 0;
+    for (const ph of list) {
+      if (ph.trackId !== track.id || ph.lat != null) continue;
+      if (ph.takenAt < track.startTime - tol || ph.takenAt > track.endTime + tol) continue;
+      const pos = posAtTime(track, ph.takenAt);
+      if (!pos) continue;
+      ph.lat = pos.lat; ph.lng = pos.lng;
+      try { await DB.put('photos', ph); n++; } catch (e) { }
+    }
+    return n;
+  }
+
+  return { url, revoke, addFiles, makeThumb, resolvePlace, ensurePlaces, locatePhotosOnTrack };
 })();
