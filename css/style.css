@@ -295,3 +295,6 @@ body {
 .toast.out { opacity: 0; transition: opacity .3s; }
 
 .hidden { display: none !important; }
+
+/* 清新底图：把瓦片柔化成浅灰调，突出路线数据 */
+.leaflet-tile-pane.cw-clean { filter: grayscale(.88) brightness(1.05) contrast(.94); }

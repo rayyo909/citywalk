@@ -14,29 +14,37 @@ const MapView = (() => {
       gaode: () => L.tileLayer(
         'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}',
         { subdomains: '1234', maxZoom: 19, maxNativeZoom: 18, attribution: '© 高德地图' }),
+      carto: () => L.tileLayer(
+        'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        { subdomains: 'abcd', maxZoom: 20, maxNativeZoom: 19, attribution: '© CARTO · © OpenStreetMap' }),
       osm: () => L.tileLayer(
         'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
         { maxZoom: 19, attribution: '© OpenStreetMap contributors' }),
     };
   }
 
+  /* 底图取值：clean（高德柔化）/ gaode（高德标准）/ carto / osm */
+  const layerKeyOf = name => name === 'clean' ? 'gaode' : name;
+  const isGaodeDisp = name => name === 'gaode' || name === 'clean';
+
   function createMap(el) {
     const m = L.map(el, { zoomControl: false });
     const defs = makeLayers();
     const osmLayer = defs.osm();
     let osmErrors = 0;
-    /* OSM 瓦片在国内网络通常无法访问，连续失败时自动切回高德 */
+    /* OSM 瓦片在国内网络通常无法访问，连续失败时自动切回清新模式 */
     osmLayer.on('tileerror', () => {
       osmErrors++;
       if (basemap === 'osm' && osmErrors >= 10) {
         osmErrors = -100000; // 防重复触发
-        Util.toast('OpenStreetMap 加载失败（国内网络通常无法访问），已切回高德地图');
+        Util.toast('OpenStreetMap 加载失败（国内网络通常无法访问），已切回清新底图');
         window.dispatchEvent(new CustomEvent('cw-osm-fallback'));
-        setBasemap('gaode');
+        setBasemap('clean');
       }
     });
-    m._cwLayers = { gaode: defs.gaode(), osm: osmLayer };
-    m._cwLayers[basemap].addTo(m);
+    m._cwLayers = { gaode: defs.gaode(), carto: defs.carto(), osm: osmLayer };
+    m._cwLayers[layerKeyOf(basemap)].addTo(m);
+    m.getPane('tilePane').classList.toggle('cw-clean', basemap === 'clean');
     L.control.zoom({ position: 'bottomright' }).addTo(m);
     maps.push(m);
     return m;
@@ -55,7 +63,7 @@ const MapView = (() => {
 
   /* WGS-84 -> 当前底图显示坐标 [lat,lng] */
   function disp(lat, lng) {
-    if (basemap === 'gaode' && !Geo.outOfChina(lng, lat)) {
+    if (isGaodeDisp(basemap) && !Geo.outOfChina(lng, lat)) {
       const g = Geo.wgs2gcj(lat, lng);
       return [g.lat, g.lng];
     }
@@ -63,15 +71,19 @@ const MapView = (() => {
   }
   /* 地图点击坐标 -> WGS-84 */
   function toWgs(lat, lng) {
-    if (basemap === 'gaode' && !Geo.outOfChina(lng, lat)) return Geo.gcj2wgs(lat, lng);
+    if (isGaodeDisp(basemap) && !Geo.outOfChina(lng, lat)) return Geo.gcj2wgs(lat, lng);
     return { lat, lng };
   }
 
   function setBasemap(name) {
     basemap = name;
+    const target = layerKeyOf(name);
     maps.forEach(m => {
-      m._cwLayers[name].addTo(m);
-      m._cwLayers[name === 'gaode' ? 'osm' : 'gaode'].remove();
+      Object.entries(m._cwLayers).forEach(([key, layer]) => {
+        if (key === target) layer.addTo(m);
+        else layer.remove();
+      });
+      m.getPane('tilePane').classList.toggle('cw-clean', name === 'clean');
     });
   }
   const basemapName = () => basemap;
@@ -83,11 +95,14 @@ const MapView = (() => {
     tracks.forEach((tr, i) => {
       if (!tr.points || !tr.points.length) return;
       const ll = tr.points.map(p => disp(p.lat, p.lng));
-      L.polyline(ll, { color: palette(i), weight: 3.5, opacity: 0.9 })
-        .bindPopup(
-          `<div class="tp"><div class="tp-name">${Util.esc(tr.name)}</div>` +
-          `<div class="tp-sub">${Util.fmtDate(tr.startTime)} · ${Geo.fmtDist(tr.distance)} · ${Geo.fmtDur(tr.activeMs)}</div></div>`,
-          { maxWidth: 260 })
+      const popup = () =>
+        `<div class="tp"><div class="tp-name">${Util.esc(tr.name)}</div>` +
+        `<div class="tp-sub">${Util.fmtDate(tr.startTime)} · ${Geo.fmtDist(tr.distance)} · ${Geo.fmtDur(tr.activeMs)}</div></div>`;
+      /* 白色描边打底，让路线从路网里跳出来 */
+      L.polyline(ll, { color: '#ffffff', weight: 7, opacity: 0.85, interactive: false })
+        .addTo(groups.tracks);
+      L.polyline(ll, { color: palette(i), weight: 4, opacity: 0.95 })
+        .bindPopup(popup(), { maxWidth: 260 })
         .addTo(groups.tracks);
     });
   }
