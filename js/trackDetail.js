@@ -89,9 +89,9 @@ const TrackDetail = (() => {
       const t = new Date(ph.takenAt);
       const p2 = n => String(n).padStart(2, '0');
       const timeStr = `${p2(t.getHours())}:${p2(t.getMinutes())}`;
-      const posStr = ph.lat != null
-        ? `${ph.lat.toFixed(4)}, ${ph.lng.toFixed(4)}`
-        : '未标注位置';
+      const posStr = ph.place
+        ? Util.esc(ph.place)
+        : (ph.lat != null ? '地址解析中…' : '未标注位置');
       const cmt = ph.comment
         ? `<div class="fm-comment">${Util.esc(ph.comment)}</div>`
         : '<div class="fm-comment placeholder">点击添加评论…</div>';
@@ -124,6 +124,8 @@ const TrackDetail = (() => {
     photos = all.filter(p => p.trackId === track.id).sort((a, b) => b.takenAt - a.takenAt);
     renderPins();
     renderFalls();
+    /* 缺地名的照片异步补全（Photon 逆地理），完成后刷新展示 */
+    Photos.ensurePlaces(photos, () => { renderPins(); renderFalls(); });
   }
 
   /* 入口：tr 为路线对象，colorIdx 用于与首页同色 */

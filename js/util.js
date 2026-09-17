@@ -15,17 +15,31 @@ const Util = (() => {
     setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 350); }, ms);
   }
 
-  /* openModal({title, content: html|Element, actions:[{label, value, className}]}) -> Promise<value|null> */
-  function openModal({ title, content, actions = [] }) {
+  /* openModal({title, content, actions, closable(右上角×), plain(内容顶格无内边距)}) -> Promise<value|null> */
+  function openModal({ title, content, actions = [], closable = false, plain = false }) {
     return new Promise(resolve => {
       const ov = document.createElement('div');
       ov.className = 'modal-overlay';
       const box = document.createElement('div');
       box.className = 'modal';
+      if (plain) box.classList.add('plain');
 
-      const t = document.createElement('div');
-      t.className = 'modal-title';
-      t.textContent = title;
+      const close = v => { ov.remove(); resolve(v); };
+
+      if (title) {
+        const t = document.createElement('div');
+        t.className = 'modal-title';
+        t.textContent = title;
+        box.appendChild(t);
+      }
+      if (closable) {
+        const x = document.createElement('button');
+        x.className = 'modal-x';
+        x.setAttribute('aria-label', '关闭');
+        x.textContent = '×';
+        x.onclick = () => close(null);
+        box.appendChild(x);
+      }
 
       const b = document.createElement('div');
       b.className = 'modal-body';
@@ -34,8 +48,7 @@ const Util = (() => {
 
       const acts = document.createElement('div');
       acts.className = 'modal-actions';
-      const close = v => { ov.remove(); resolve(v); };
-      if (!actions.length) {
+      if (!actions.length && !closable) {
         const ok = document.createElement('button');
         ok.className = 'btn btn-primary';
         ok.textContent = '好的';
@@ -51,7 +64,7 @@ const Util = (() => {
         });
       }
 
-      box.append(t, b, acts);
+      box.append(b, acts);
       ov.appendChild(box);
       ov.addEventListener('click', e => { if (e.target === ov) close(null); });
       document.body.appendChild(ov);

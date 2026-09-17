@@ -303,22 +303,21 @@ const App = (() => {
       `⏱ <b>${fmtHhMm(ms)}</b>&nbsp; ↗ <b>${km.toFixed(1)}</b> km &nbsp; ▦ <b>${area.toFixed(1)}</b> km²`;
   }
 
-  /* ---------- 照片详情弹窗（评论/删除/标注） ---------- */
+  /* ---------- 照片详情弹窗（右上角×关闭；地址名；评论/删除） ---------- */
   async function openPhoto(ph, refresh) {
     const content = document.createElement('div');
-    const pos = ph.lat != null ? `${ph.lat.toFixed(5)}, ${ph.lng.toFixed(5)}` : '未标注位置';
+    const d = new Date(ph.takenAt);
+    const p2 = n => String(n).padStart(2, '0');
+    const timeStr = `${Util.fmtDate(ph.takenAt)} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+    const placeStr = ph.place || (ph.lat != null ? '地址解析中…' : '未标注位置');
     content.innerHTML = `
-      <img class="pd-img" src="${Photos.url(ph)}" alt="">
-      <div class="pd-name">${Util.esc(ph.name)}</div>
-      <div class="pd-meta">${Util.fmtDateTime(ph.takenAt)}<br>${pos}${ph.comment ? '<br>💬 ' + Util.esc(ph.comment) : ''}</div>`;
+      <img class="pd-img-full" src="${Photos.url(ph)}" alt="">
+      <div class="pd-meta-v2">${timeStr} · ${Util.esc(placeStr)}${ph.comment ? '<br>💬 ' + Util.esc(ph.comment) : ''}</div>`;
     const act = await Util.openModal({
-      title: '照片',
-      content,
+      title: '', closable: true, plain: true, content,
       actions: [
-        { label: '关闭', value: 'close' },
         { label: '评论', value: 'comment' },
         { label: '删除', value: 'del', className: 'btn-danger-ghost' },
-        { label: ph.lat != null ? '改位置' : '标注位置', value: 'place', className: 'btn-primary' },
       ],
     });
     if (act === 'comment') {
@@ -336,8 +335,6 @@ const App = (() => {
         await reload();
         refresh && refresh();
       }
-    } else if (act === 'place') {
-      startPlacing(ph);
     }
   }
 

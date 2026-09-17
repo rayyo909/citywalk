@@ -423,3 +423,17 @@ body {
 /* 记录页照片按钮 */
 .rec-photo { background: var(--bg); color: var(--text); box-shadow: none; padding: 13px 18px; }
 .ti-photo { font-size: 12px; color: var(--muted); flex: none; }
+
+/* 照片弹窗（plain 模式）：右上角×关闭、内容顶格 */
+.modal { position: relative; }
+.modal-x {
+  position: absolute; top: 8px; right: 8px; z-index: 5;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: none; background: rgba(45,45,45,.5); color: #fff;
+  font-size: 17px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-x:active { transform: scale(.9); }
+.modal.plain .modal-body { padding: 0; }
+.pd-img-full { display: block; width: 100%; max-height: 48dvh; object-fit: contain; background: #1B1B1B; }
+.pd-meta-v2 { padding: 10px 16px 4px; font-size: 13px; color: var(--muted); line-height: 1.6; }

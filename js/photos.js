@@ -88,5 +88,44 @@ const Photos = (() => {
     return stat;
   }
 
-  return { url, revoke, addFiles, makeThumb };
+  /* 逆地理编码：坐标 → 中文地址名（Photon，免费无 key；结果缓存在 photo.place） */
+  async function resolvePlace(lat, lng) {
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 5000);
+    try {
+      const r = await fetch(
+        `https://photon.komoot.io/reverse?lat=${lat}&lon=${lng}&lang=default`,
+        { signal: ctl.signal });
+      const j = await r.json();
+      clearTimeout(timer);
+      const p = j && j.features && j.features[0] && j.features[0].properties;
+      if (!p) return '';
+      const parts = [];
+      if (p.name) parts.push(p.name);
+      else if (p.street) parts.push(p.street);
+      else if (p.locality) parts.push(p.locality);
+      if (p.district && p.district !== parts[0]) parts.push(p.district);
+      if (parts.length < 2 && p.city) parts.push(p.city);
+      return [...new Set(parts)].slice(0, 3).join(' · ');
+    } catch (e) {
+      clearTimeout(timer);
+      return '';
+    }
+  }
+
+  /* 给列表里缺地名的照片补地址（串行、限流，最多 10 张），完成后回调刷新界面 */
+  async function ensurePlaces(list, onChange) {
+    const need = list.filter(p => p.lat != null && !p.place).slice(0, 10);
+    if (!need.length) return;
+    for (const ph of need) {
+      const place = await resolvePlace(ph.lat, ph.lng);
+      if (place) {
+        ph.place = place;
+        try { await DB.put('photos', ph); } catch (e) { }
+      }
+    }
+    onChange && onChange();
+  }
+
+  return { url, revoke, addFiles, makeThumb, resolvePlace, ensurePlaces };
 })();
