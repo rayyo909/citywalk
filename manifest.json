@@ -1,6 +1,6 @@
 {
-  "name": "走走 Walkies",
-  "short_name": "走走",
+  "name": "去走走 Walkies",
+  "short_name": "去走走",
   "description": "记录每次行走的路线与照片，在地图上汇总你的城市足迹",
   "start_url": "./index.html",
   "display": "standalone",
@@ -11,6 +11,18 @@
       "src": "icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
       "purpose": "any"
     }
   ]

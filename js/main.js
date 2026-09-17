@@ -73,7 +73,7 @@ const App = (() => {
     updateLive(s);
   }
 
-  const defaultName = ts => Util.fmtDate(ts || Date.now()) + ' 走走';
+  const defaultName = ts => Util.fmtDate(ts || Date.now()) + ' 去走走';
 
   async function onFinishClick() {
     if (Tracker.getState() === 'idle') return;
@@ -248,7 +248,7 @@ const App = (() => {
     const pts = tr.points.map(p =>
       `      <trkpt lat="${p.lat.toFixed(6)}" lon="${p.lng.toFixed(6)}"><time>${new Date(p.t).toISOString()}</time></trkpt>`
     ).join('\n');
-    const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="走走 Walkies" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>${Util.esc(tr.name)}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>\n</gpx>`;
+    const gpx = `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="去走走 Walkies" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk>\n    <name>${Util.esc(tr.name)}</name>\n    <trkseg>\n${pts}\n    </trkseg>\n  </trk>\n</gpx>`;
     Util.downloadFile(gpx, tr.name.replace(/[\\/:*?"<>|]/g, '_') + '.gpx', 'application/gpx+xml');
   }
 
@@ -570,7 +570,7 @@ const App = (() => {
         content: `
           <p class="modal-text">按顺序检查这三件事：</p>
           <p class="modal-text"><b>1. 是否在微信/QQ 里打开的？</b><br>内置浏览器会禁用网页定位。点右上角「···」→「在浏览器打开」，或复制链接到 Safari / Chrome 再试。</p>
-          <p class="modal-text"><b>2. iPhone</b><br>设置 → 隐私与安全性 → 定位服务 → 打开总开关，并把列表中的「Safari 网站」设为「使用 App 期间」（添加到主屏幕的显示为走走）。若之前拒绝过，改完回到本页刷新。</p>
+          <p class="modal-text"><b>2. iPhone</b><br>设置 → 隐私与安全性 → 定位服务 → 打开总开关，并把列表中的「Safari 网站」设为「使用 App 期间」（添加到主屏幕的显示为去走走）。若之前拒绝过，改完回到本页刷新。</p>
           <p class="modal-text"><b>3. 安卓</b><br>点地址栏左侧的锁图标 → 权限 → 位置 → 允许，然后刷新页面。</p>`,
         actions: [{ label: '知道了', value: 'ok', className: 'btn-primary' }],
       });
